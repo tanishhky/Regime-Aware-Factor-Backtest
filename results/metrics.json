@@ -1,0 +1,36 @@
+{
+  "portfolio": {
+    "final_value": 22572372.76321339,
+    "total_return": 21.572372763213387,
+    "annual_return": 0.18927343089441417,
+    "volatility": 0.20970170150487139,
+    "sharpe_ratio": 0.9025841446976401,
+    "max_drawdown": -0.3400597368958902
+  },
+  "spy": {
+    "final_value": 6924034.596885997,
+    "total_return": 5.924034596885996,
+    "annual_return": 0.11362287431602924,
+    "volatility": 0.19891980781401614,
+    "sharpe_ratio": 0.5711993972076582,
+    "max_drawdown": -0.5148146229379017
+  },
+  "trading": {
+    "total_trades": 1497,
+    "total_transaction_costs": 187824.01123958244,
+    "regime_distribution": {
+      "bull": 2004,
+      "normal": 1232,
+      "bear": 819,
+      "crisis": 476
+    },
+    "delistings_detected": 0,
+    "delisted_tickers": []
+  },
+  "bias_controls": {
+    "pit_method": "asof_date (SEC acceptance_datetime)",
+    "fallback_lag_days": 60,
+    "delisting_return_assumption": -0.3,
+    "survivorship_warnings": []
+  }
+}
