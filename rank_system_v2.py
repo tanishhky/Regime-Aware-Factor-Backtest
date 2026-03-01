@@ -88,15 +88,12 @@ def _compute_raw_metrics(df: pd.DataFrame) -> pd.DataFrame:
     # Total Debt
     df['total_debt'] = df['short_term_debt'].fillna(0) + df['long_term_debt'].fillna(0)
 
-    # Tax Rate and NOPAT
-    tax_rate = df['income_tax_expense'] / df['pretax_income'].replace(0, np.nan)
-    tax_rate = tax_rate.fillna(0.21)  # Default corporate tax rate
-    tax_rate = tax_rate.clip(0, 1)    # Clamp between 0% and 100%
-    nopat = df['ebit'] * (1 - tax_rate)
-
-    # ROIC = NOPAT / (Debt + Equity)
+    # ROIC = EBIT / (Debt + Equity)
+    # Uses EBIT (not NOPAT) intentionally: operating efficiency is measured
+    # pre-tax here because capital structure effects are captured separately
+    # by the D/E inverse component in the scoring formula.
     invested_capital = df['total_debt'] + df['total_equity'].replace(0, np.nan)
-    df['roic'] = nopat / invested_capital
+    df['roic'] = df['ebit'] / invested_capital
 
     # FCF Margin = (CFO - |CapEx|) / Revenue
     fcf = df['cfo'] - df['capex'].abs()
@@ -168,7 +165,7 @@ def build_pit_rankings(data_dir: str) -> dict:
         if col in income.columns:
             extra_cols.append(col)
 
-    inc_cols = ['ticker', 'period_end', 'revenue', 'net_income', 'ebit', 'pretax_income', 'income_tax_expense'] + extra_cols
+    inc_cols = ['ticker', 'period_end', 'revenue', 'net_income', 'ebit'] + extra_cols
     inc = income[[c for c in inc_cols if c in income.columns]].drop_duplicates(
         subset=['ticker', 'period_end']
     )

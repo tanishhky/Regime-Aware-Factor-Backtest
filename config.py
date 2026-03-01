@@ -113,10 +113,11 @@ ENABLE_FF5_ATTRIBUTION = True        # Regress daily returns against Fama-French
 # =============================================================================
 # 12. SCORING FORMULA WEIGHTS
 # =============================================================================
-# The stability score intentionally overweights leverage aversion via the
-# bounded inverse D/E transform. This is the core investment thesis, not
-# a normalization choice. See README for rationale.
-SCORE_WEIGHT_ROIC = 0.30
+# The stability score uses EBIT-based ROIC (not NOPAT) to measure pure
+# operating efficiency, while capital structure risk is captured separately
+# by the bounded inverse D/E transform. This separation of concerns avoids
+# double-penalizing leveraged firms.
+SCORE_WEIGHT_ROIC = 0.30             # EBIT / Invested Capital
 SCORE_WEIGHT_FCF_MARGIN = 0.25
 SCORE_WEIGHT_DE_INVERSE = 0.25       # Uses 1/(D/E + 1) ∈ [0,1], deliberately outsized
 SCORE_WEIGHT_REV_GROWTH = 0.20
