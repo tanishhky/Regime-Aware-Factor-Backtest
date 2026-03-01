@@ -673,9 +673,17 @@ class RegimeAwareBacktester:
             import statsmodels.api as sm
             print("  Running Fama-French 5-Factor OLS regression...")
             
-            # Fetch FF5 Daily Data
-            ff5 = web.DataReader('F-F_Research_Data_5_Factors_2x3_daily', 'famafrench', 
-                                 start=port_returns.index[0], end=port_returns.index[-1])[0]
+            # Fetch FF5 Daily Data (with caching)
+            ff5_cache_path = os.path.join(self.script_dir, "ff5_data.parquet")
+            if os.path.exists(ff5_cache_path):
+                ff5 = pd.read_parquet(ff5_cache_path)
+            else:
+                ff5 = web.DataReader('F-F_Research_Data_5_Factors_2x3_daily', 'famafrench', 
+                                     start="2000-01-01", end=pd.Timestamp.today().strftime('%Y-%m-%d'))[0]
+                ff5.to_parquet(ff5_cache_path)
+            
+            # Slice to required index
+            ff5 = ff5.loc[port_returns.index[0]:port_returns.index[-1]]
             
             ff5_returns = ff5 / 100.0
             df = pd.DataFrame({'Strategy': port_returns}).join(ff5_returns, how='inner').dropna()
