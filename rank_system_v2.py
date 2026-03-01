@@ -88,9 +88,15 @@ def _compute_raw_metrics(df: pd.DataFrame) -> pd.DataFrame:
     # Total Debt
     df['total_debt'] = df['short_term_debt'].fillna(0) + df['long_term_debt'].fillna(0)
 
-    # ROIC = EBIT / (Debt + Equity)
+    # Tax Rate and NOPAT
+    tax_rate = df['income_tax_expense'] / df['pretax_income'].replace(0, np.nan)
+    tax_rate = tax_rate.fillna(0.21)  # Default corporate tax rate
+    tax_rate = tax_rate.clip(0, 1)    # Clamp between 0% and 100%
+    nopat = df['ebit'] * (1 - tax_rate)
+
+    # ROIC = NOPAT / (Debt + Equity)
     invested_capital = df['total_debt'] + df['total_equity'].replace(0, np.nan)
-    df['roic'] = df['ebit'] / invested_capital
+    df['roic'] = nopat / invested_capital
 
     # FCF Margin = (CFO - |CapEx|) / Revenue
     fcf = df['cfo'] - df['capex'].abs()
@@ -120,14 +126,6 @@ def _compute_ewma_score(ticker_filings: pd.DataFrame) -> pd.DataFrame:
     tf['fcf_margin_ewma'] = calc_ewma(tf['fcf_margin'])
     tf['d_e_ewma'] = calc_ewma(tf['d_e'])
     tf['rev_growth_ewma'] = calc_ewma(tf['rev_growth'])
-
-    d_e_clamped = np.maximum(tf['d_e_ewma'], 0)
-    tf['stability_score'] = (
-        0.30 * tf['roic_ewma'] +
-        0.25 * tf['fcf_margin_ewma'] +
-        0.25 * (1 / (d_e_clamped + 1)) +
-        0.20 * tf['rev_growth_ewma']
-    )
 
     return tf
 
@@ -162,7 +160,7 @@ def build_pit_rankings(data_dir: str) -> dict:
         if col in income.columns:
             extra_cols.append(col)
 
-    inc_cols = ['ticker', 'period_end', 'revenue', 'net_income', 'ebit'] + extra_cols
+    inc_cols = ['ticker', 'period_end', 'revenue', 'net_income', 'ebit', 'pretax_income', 'income_tax_expense'] + extra_cols
     inc = income[[c for c in inc_cols if c in income.columns]].drop_duplicates(
         subset=['ticker', 'period_end']
     )
@@ -240,17 +238,42 @@ def build_pit_rankings(data_dir: str) -> dict:
 
         # But for EWMA, we need the full PIT history per ticker
         # Compute EWMA scores for each ticker using their full available history
-        all_scores = {}
+        all_metrics = {}
         for ticker, group in pit_data.groupby('ticker'):
             if len(group) < config.MIN_FILING_HISTORY:
                 continue  # Not enough history to compute growth + EWMA
             scored = _compute_ewma_score(group)
-            if scored['stability_score'].isna().all():
-                continue
-            # Use the latest score
-            latest_score = scored['stability_score'].iloc[-1]
-            if pd.notna(latest_score):
-                all_scores[ticker] = latest_score
+            
+            # Use the latest scores
+            latest = scored.iloc[-1]
+            if pd.notna(latest['roic_ewma']):
+                all_metrics[ticker] = {
+                    'roic': latest['roic_ewma'],
+                    'fcf_margin': latest['fcf_margin_ewma'],
+                    'd_e_clamped': max(latest['d_e_ewma'], 0),
+                    'rev_growth': latest['rev_growth_ewma']
+                }
+
+        if not all_metrics:
+            continue
+
+        # Cross-sectional Z-Scoring
+        metrics_df = pd.DataFrame.from_dict(all_metrics, orient='index').dropna()
+        if len(metrics_df) < 2:
+            continue
+            
+        z_scores = (metrics_df - metrics_df.mean()) / metrics_df.std().replace(0, 1)
+        
+        # Calculate Stability Score combining Z-Scores
+        # D/E should be inverted (lower D/E is better, so negate its z-score)
+        stability_scores = (
+            0.30 * z_scores['roic'] +
+            0.25 * z_scores['fcf_margin'] +
+            0.25 * (-z_scores['d_e_clamped']) +
+            0.20 * z_scores['rev_growth']
+        )
+        
+        all_scores = stability_scores.to_dict()
 
         if not all_scores:
             continue

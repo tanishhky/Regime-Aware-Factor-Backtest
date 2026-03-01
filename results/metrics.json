@@ -1,28 +1,28 @@
 {
   "portfolio": {
-    "final_value": 22572372.76321339,
-    "total_return": 21.572372763213387,
-    "annual_return": 0.18927343089441417,
-    "volatility": 0.20970170150487139,
-    "sharpe_ratio": 0.9025841446976401,
-    "max_drawdown": -0.3400597368958902
+    "final_value": 22375210.50251305,
+    "total_return": 21.375210502513053,
+    "annual_return": 0.1888294328472584,
+    "volatility": 0.2761475434970691,
+    "sharpe_ratio": 0.6837990679039393,
+    "max_drawdown": -0.5301632840781053
   },
   "spy": {
-    "final_value": 6924034.596885997,
-    "total_return": 5.924034596885996,
-    "annual_return": 0.11362287431602924,
-    "volatility": 0.19891980781401614,
-    "sharpe_ratio": 0.5711993972076582,
+    "final_value": 7158935.324888334,
+    "total_return": 6.158935324888334,
+    "annual_return": 0.1157720735268517,
+    "volatility": 0.1988979201092866,
+    "sharpe_ratio": 0.5820677936865277,
     "max_drawdown": -0.5148146229379017
   },
   "trading": {
-    "total_trades": 1497,
-    "total_transaction_costs": 187824.01123958244,
+    "total_trades": 1375,
+    "total_transaction_costs": 238329.27680519628,
     "regime_distribution": {
-      "bull": 2004,
-      "normal": 1232,
-      "bear": 819,
-      "crisis": 476
+      "bull": 1869,
+      "normal": 1662,
+      "bear": 694,
+      "crisis": 303
     },
     "delistings_detected": 0,
     "delisted_tickers": []
@@ -32,5 +32,14 @@
     "fallback_lag_days": 60,
     "delisting_return_assumption": -0.3,
     "survivorship_warnings": []
+  },
+  "ff5_attribution": {
+    "alpha_annualized": 0.10245919893418605,
+    "Mkt-RF": 0.8146821047918761,
+    "SMB": 0.3412580017866377,
+    "HML": 0.03282421767514072,
+    "RMW": -0.10568038689396024,
+    "CMA": 0.13394020937375983,
+    "r_squared": 0.4201157325188154
   }
 }

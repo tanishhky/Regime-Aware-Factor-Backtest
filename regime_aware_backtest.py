@@ -462,8 +462,9 @@ class RegimeAwareBacktester:
                     self._buy(ticker, allocation, price, regime, date, reason)
 
         # ── STEP D: Panic-buy during crisis/bear ──────────────────────
-        if regime in ('crisis', 'bear'):
-            self._execute_panic_buy(date, ranked_list, current_rankings, regime)
+        if config.ENABLE_PANIC_BUY:
+            if regime in ('crisis', 'bear'):
+                self._execute_panic_buy(date, ranked_list, current_rankings, regime)
 
         # Save for next rebalance's rank-jump detection
         self.prev_rankings = current_rankings
@@ -663,8 +664,43 @@ class RegimeAwareBacktester:
         return self._build_results()
 
     # ─────────────────────────────────────────────────────────────────────
-    # Results
+    # Results & FF5
     # ─────────────────────────────────────────────────────────────────────
+    def _run_ff5_regression(self, port_returns: pd.Series) -> dict:
+        """Run Fama-French 5-Factor regression on daily returns."""
+        try:
+            import pandas_datareader.data as web
+            import statsmodels.api as sm
+            print("  Running Fama-French 5-Factor OLS regression...")
+            
+            # Fetch FF5 Daily Data
+            ff5 = web.DataReader('F-F_Research_Data_5_Factors_2x3_daily', 'famafrench', 
+                                 start=port_returns.index[0], end=port_returns.index[-1])[0]
+            
+            ff5_returns = ff5 / 100.0
+            df = pd.DataFrame({'Strategy': port_returns}).join(ff5_returns, how='inner').dropna()
+
+            if len(df) < 100:
+                return {"error": "Not enough data overlap with FF5 factors."}
+
+            Y = df['Strategy'] - df['RF']
+            X = df[['Mkt-RF', 'SMB', 'HML', 'RMW', 'CMA']]
+            X = sm.add_constant(X)
+            model = sm.OLS(Y, X).fit()
+
+            return {
+                'alpha_annualized': model.params['const'] * 252,
+                'Mkt-RF': model.params['Mkt-RF'],
+                'SMB': model.params['SMB'],
+                'HML': model.params['HML'],
+                'RMW': model.params['RMW'],
+                'CMA': model.params['CMA'],
+                'r_squared': model.rsquared
+            }
+        except Exception as e:
+            print(f"  ⚠ Fama-French OLS failed: {e}")
+            return {"error": str(e)}
+
     def _build_results(self) -> dict:
         """Compile results into a summary."""
         history_df = pd.DataFrame(self.portfolio_history).set_index('date')
@@ -733,6 +769,9 @@ class RegimeAwareBacktester:
                 }
             }
         }
+        
+        if getattr(config, 'ENABLE_FF5_ATTRIBUTION', False):
+            results['metrics']['ff5_attribution'] = self._run_ff5_regression(port_returns)
 
         self._print_summary(results)
         return results
@@ -780,6 +819,19 @@ class RegimeAwareBacktester:
 
         outperf = p['total_return'] - s['total_return']
         print(f"\n  Outperformance: {outperf:+.2%}")
+        
+        ff5 = m.get('ff5_attribution', {})
+        if ff5 and 'error' not in ff5:
+            print(f"\n{'Fama-French 5-Factor Attribution':}")
+            print("-" * 70)
+            print(f"  Alpha (Annualized):  {ff5['alpha_annualized']:>8.2%}")
+            print(f"  Market (Mkt-RF):     {ff5['Mkt-RF']:>8.2f}")
+            print(f"  Size (SMB):          {ff5['SMB']:>8.2f}")
+            print(f"  Value (HML):         {ff5['HML']:>8.2f}")
+            print(f"  Quality (RMW):       {ff5['RMW']:>8.2f}")
+            print(f"  Investment (CMA):    {ff5['CMA']:>8.2f}")
+            print(f"  R-Squared:           {ff5['r_squared']:>8.2f}")
+
         print("=" * 70)
 
 

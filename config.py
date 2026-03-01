@@ -99,7 +99,13 @@ WARN_MISSING_PRICE_TICKERS = True
 # =============================================================================
 # 10. DATA PATHS
 # =============================================================================
-DATA_DIR = "historical_data"
-PRICE_CACHE = "price_data.parquet"
-RANKINGS_CACHE = "pit_rankings.json"
-OUTPUT_DIR = "results"
+DATA_DIR = "historical_data"         # Directory with parquet fundamentals
+PRICE_CACHE = "price_data.parquet"   # Cached yfinance prices
+RANKINGS_CACHE = "all_rankings.json" # Full rankings output
+OUTPUT_DIR = "results"               # Output directory for charts/reports
+
+# =============================================================================
+# 11. STRATEGY OVERLAYS AND REPORTING
+# =============================================================================
+ENABLE_PANIC_BUY = True              # Discretionary overlay to buy dips in crisis
+ENABLE_FF5_ATTRIBUTION = True        # Regress daily returns against Fama-French 5
