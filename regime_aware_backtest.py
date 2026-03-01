@@ -23,7 +23,9 @@ import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import matplotlib.ticker as mticker
+import warnings
 from collections import defaultdict
+from tqdm import tqdm
 
 import config
 from rank_system_v2 import build_pit_rankings
@@ -601,6 +603,7 @@ class RegimeAwareBacktester:
 
         self.prev_rankings = self._get_current_rankings(first_rebalance_str)
         print(f"  ✓ Invested in {len(self.positions)} positions")
+        print("\n  Starting daily backtest simulation...")
 
         # ── Day-by-day loop ───────────────────────────────────────────
         last_regime_fit_date = None
@@ -608,7 +611,7 @@ class RegimeAwareBacktester:
 
         processed_rebalances = {start_date.date()}  # Don't re-trigger first day
 
-        for i, date in enumerate(valid_dates):
+        for i, date in enumerate(tqdm(valid_dates, desc="Simulating Days", unit="day")):
             # -- Regime detection (periodic refit) --
             if (last_regime_fit_date is None or
                     (date - last_regime_fit_date).days >= regime_refit_interval):
