@@ -109,3 +109,14 @@ OUTPUT_DIR = "results"               # Output directory for charts/reports
 # =============================================================================
 ENABLE_PANIC_BUY = True              # Discretionary overlay to buy dips in crisis
 ENABLE_FF5_ATTRIBUTION = True        # Regress daily returns against Fama-French 5
+
+# =============================================================================
+# 12. SCORING FORMULA WEIGHTS
+# =============================================================================
+# The stability score intentionally overweights leverage aversion via the
+# bounded inverse D/E transform. This is the core investment thesis, not
+# a normalization choice. See README for rationale.
+SCORE_WEIGHT_ROIC = 0.30
+SCORE_WEIGHT_FCF_MARGIN = 0.25
+SCORE_WEIGHT_DE_INVERSE = 0.25       # Uses 1/(D/E + 1) ∈ [0,1], deliberately outsized
+SCORE_WEIGHT_REV_GROWTH = 0.20

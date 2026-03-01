@@ -1,28 +1,28 @@
 {
   "portfolio": {
-    "final_value": 22375210.50251305,
-    "total_return": 21.375210502513053,
-    "annual_return": 0.1888294328472584,
-    "volatility": 0.2761475434970691,
-    "sharpe_ratio": 0.6837990679039393,
-    "max_drawdown": -0.5301632840781053
+    "final_value": 19763078.68218576,
+    "total_return": 18.76307868218576,
+    "annual_return": 0.18051460916299078,
+    "volatility": 0.23987703424888518,
+    "sharpe_ratio": 0.7525297689636152,
+    "max_drawdown": -0.46539972873030155
   },
   "spy": {
-    "final_value": 7158935.324888334,
-    "total_return": 6.158935324888334,
-    "annual_return": 0.1157720735268517,
-    "volatility": 0.1988979201092866,
-    "sharpe_ratio": 0.5820677936865277,
+    "final_value": 6924034.596885997,
+    "total_return": 5.924034596885996,
+    "annual_return": 0.11362287431602924,
+    "volatility": 0.19891980781401614,
+    "sharpe_ratio": 0.5711993972076582,
     "max_drawdown": -0.5148146229379017
   },
   "trading": {
-    "total_trades": 1375,
-    "total_transaction_costs": 238329.27680519628,
+    "total_trades": 2028,
+    "total_transaction_costs": 169264.59620744124,
     "regime_distribution": {
-      "bull": 1869,
-      "normal": 1662,
-      "bear": 694,
-      "crisis": 303
+      "bull": 2004,
+      "normal": 1232,
+      "bear": 819,
+      "crisis": 476
     },
     "delistings_detected": 0,
     "delisted_tickers": []
@@ -34,12 +34,42 @@
     "survivorship_warnings": []
   },
   "ff5_attribution": {
-    "alpha_annualized": 0.10245919893418605,
-    "Mkt-RF": 0.8146821047918761,
-    "SMB": 0.3412580017866377,
-    "HML": 0.03282421767514072,
-    "RMW": -0.10568038689396024,
-    "CMA": 0.13394020937375983,
-    "r_squared": 0.4201157325188154
+    "alpha_annualized": 0.07905398590109294,
+    "alpha_tstat": 2.040067531181999,
+    "alpha_pvalue": 0.041402063673114026,
+    "Mkt-RF": 0.8251032070810695,
+    "SMB": 0.2738623953318007,
+    "HML": -0.053355019888202716,
+    "RMW": -0.09829797614041327,
+    "CMA": 0.17317105499308116,
+    "r_squared": 0.5368625931552198
+  },
+  "ff5_first_half": {
+    "alpha_annualized": 0.10772566386652536,
+    "alpha_tstat": 2.6209063209767725,
+    "alpha_pvalue": 0.00882840462373346,
+    "Mkt-RF": 0.7500519087231015,
+    "SMB": 0.28566007729998044,
+    "HML": -0.09459297511345685,
+    "RMW": -0.08288503093167203,
+    "CMA": 0.05383525336052587,
+    "r_squared": 0.6477707615054247,
+    "sharpe": 0.9078189925507443,
+    "start_date": "2008-02",
+    "end_date": "2017-02"
+  },
+  "ff5_second_half": {
+    "alpha_annualized": 0.05033525655829759,
+    "alpha_tstat": 0.7721665416681076,
+    "alpha_pvalue": 0.44009798632130903,
+    "Mkt-RF": 0.9369928417349012,
+    "SMB": 0.184040436541473,
+    "HML": 0.07713709282096595,
+    "RMW": -0.24194397505603601,
+    "CMA": 0.19480294744052912,
+    "r_squared": 0.4851214688306308,
+    "sharpe": 0.6454744028738755,
+    "start_date": "2017-02",
+    "end_date": "2026-02"
   }
 }

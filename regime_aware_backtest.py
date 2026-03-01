@@ -690,6 +690,8 @@ class RegimeAwareBacktester:
 
             return {
                 'alpha_annualized': model.params['const'] * 252,
+                'alpha_tstat': model.tvalues['const'],
+                'alpha_pvalue': model.pvalues['const'],
                 'Mkt-RF': model.params['Mkt-RF'],
                 'SMB': model.params['SMB'],
                 'HML': model.params['HML'],
@@ -772,6 +774,31 @@ class RegimeAwareBacktester:
         
         if getattr(config, 'ENABLE_FF5_ATTRIBUTION', False):
             results['metrics']['ff5_attribution'] = self._run_ff5_regression(port_returns)
+            
+            # Sub-periods
+            if len(port_returns) > 200:
+                midpoint = port_returns.index[len(port_returns) // 2]
+                
+                port_returns_fh = port_returns.loc[:midpoint]
+                port_returns_sh = port_returns.loc[midpoint:]
+                
+                results['metrics']['ff5_first_half'] = self._run_ff5_regression(port_returns_fh)
+                results['metrics']['ff5_second_half'] = self._run_ff5_regression(port_returns_sh)
+                
+                # Sub-period Sharpes
+                if 'error' not in results['metrics']['ff5_first_half']:
+                    fh_annual = (1 + port_returns_fh).prod() ** (252 / len(port_returns_fh)) - 1 if len(port_returns_fh) > 0 else 0
+                    fh_vol = port_returns_fh.std() * np.sqrt(252)
+                    results['metrics']['ff5_first_half']['sharpe'] = fh_annual / fh_vol if fh_vol > 0 else 0
+                    results['metrics']['ff5_first_half']['start_date'] = port_returns_fh.index[0].strftime('%Y-%m')
+                    results['metrics']['ff5_first_half']['end_date'] = port_returns_fh.index[-1].strftime('%Y-%m')
+                
+                if 'error' not in results['metrics']['ff5_second_half']:
+                    sh_annual = (1 + port_returns_sh).prod() ** (252 / len(port_returns_sh)) - 1 if len(port_returns_sh) > 0 else 0
+                    sh_vol = port_returns_sh.std() * np.sqrt(252)
+                    results['metrics']['ff5_second_half']['sharpe'] = sh_annual / sh_vol if sh_vol > 0 else 0
+                    results['metrics']['ff5_second_half']['start_date'] = port_returns_sh.index[0].strftime('%Y-%m')
+                    results['metrics']['ff5_second_half']['end_date'] = port_returns_sh.index[-1].strftime('%Y-%m')
 
         self._print_summary(results)
         return results
@@ -825,12 +852,36 @@ class RegimeAwareBacktester:
             print(f"\n{'Fama-French 5-Factor Attribution':}")
             print("-" * 70)
             print(f"  Alpha (Annualized):  {ff5['alpha_annualized']:>8.2%}")
+            print(f"  Alpha t-stat:        {ff5['alpha_tstat']:>8.2f}")
+            print(f"  Alpha p-value:       {ff5['alpha_pvalue']:>8.4f}")
+            if ff5['alpha_pvalue'] < 0.01:
+                print(f"  Significance:        *** (p < 0.01)")
+            elif ff5['alpha_pvalue'] < 0.05:
+                print(f"  Significance:        **  (p < 0.05)")
+            elif ff5['alpha_pvalue'] < 0.10:
+                print(f"  Significance:        *   (p < 0.10)")
+            else:
+                print(f"  Significance:        Not significant (p >= 0.10)")
+                
             print(f"  Market (Mkt-RF):     {ff5['Mkt-RF']:>8.2f}")
             print(f"  Size (SMB):          {ff5['SMB']:>8.2f}")
             print(f"  Value (HML):         {ff5['HML']:>8.2f}")
             print(f"  Quality (RMW):       {ff5['RMW']:>8.2f}")
             print(f"  Investment (CMA):    {ff5['CMA']:>8.2f}")
             print(f"  R-Squared:           {ff5['r_squared']:>8.2f}")
+
+            # Sub-periods
+            fh = m.get('ff5_first_half', {})
+            sh = m.get('ff5_second_half', {})
+            if fh and 'error' not in fh and sh and 'error' not in sh:
+                print(f"\n{'Sub-Period Robustness':}")
+                print("-" * 70)
+                print(f"  First Half ({fh['start_date']} to {fh['end_date']}):")
+                print(f"    Alpha: {fh['alpha_annualized']:.2%}  (t={fh['alpha_tstat']:.2f}, p={fh['alpha_pvalue']:.4f})")
+                print(f"    Sharpe: {fh.get('sharpe', 0):.2f}")
+                print(f"  Second Half ({sh['start_date']} to {sh['end_date']}):")
+                print(f"    Alpha: {sh['alpha_annualized']:.2%}  (t={sh['alpha_tstat']:.2f}, p={sh['alpha_pvalue']:.4f})")
+                print(f"    Sharpe: {sh.get('sharpe', 0):.2f}")
 
         print("=" * 70)
 
