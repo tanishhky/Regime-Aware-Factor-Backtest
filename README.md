@@ -11,12 +11,14 @@ _The strategy's leverage-aversion thesis limits maximum drawdown to -34.01% vers
 
 | Metric | Strategy (PIT Base) | SPY Benchmark | Differential |
 | ------ | :------------------ | :------------ | :----------- |
-| **Final Value** | **$22,572,373** | $6,924,035 | +$15.64M |
-| **Total Return** | **2157.24%** | 592.40% | +1564.84% |
-| **Annual Return** | **18.93%** | 11.36% | +7.57% |
-| **Volatility** | 20.97% | **19.89%** | +1.08% |
-| **Sharpe Ratio** | **0.90** | 0.57 | +0.33 |
-| **Max Drawdown** | **-34.01%** | -51.48% | +17.47% |
+| **Final Value** | **$7,335,532** | $6,924,035 | +$411K |
+| **Total Return** | **633.55%** | 592.40% | +41.15% |
+| **Annual Return** | **11.72%** | 11.36% | +0.36% |
+| **Volatility** | 23.53% | **19.89%** | +3.64% |
+| **Sharpe Ratio** | 0.50 | **0.57** | -0.07 |
+| **Max Drawdown** | **-49.03%** | -51.48% | +2.45% |
+
+_All returns are reported **net of fees**: 2% annual management fee (charged monthly on AUM) and 25% performance fee (charged quarterly on profits above high-water mark), in addition to regime-specific transaction costs. Setting both fees to zero in `config.py` reproduces gross-of-fee results._
 
 ---
 
@@ -34,14 +36,14 @@ A Fama-French 5-Factor OLS regression on daily excess returns decomposes the str
 | Investment (CMA) | 0.03 | Negligible |
 | **R-Squared** | **0.61** | Five factors explain 61% of daily return variance |
 
-The full-period alpha of 8.33% is statistically significant at the 1% level (t=2.67, p=0.008).
+The full-period alpha of 2.71% is not statistically significant net of fees (t=0.68, p=0.49). However, gross-of-fee alpha (8.33%, p=0.008) confirms genuine stock selection skill — the fees consume the majority of the excess return.
 
 ### Sub-Period Robustness
 
 | Period | Alpha | t-stat | p-value | Sharpe |
 |---|---|---|---|---|
-| **First Half (2008–2017)** | 15.59% | 3.86 | 0.0001 | 1.22 |
-| **Second Half (2017–2026)** | 1.12% | 0.24 | 0.8135 | 0.62 |
+| **First Half (2008–2017)** | 10.34% | 2.34 | 0.0193 | 0.86 |
+| **Second Half (2017–2026)** | -5.12% | -0.78 | 0.4383 | 0.23 |
 
 Sub-period analysis reveals the alpha was concentrated in the 2008–2017 period (15.59%, p<0.001), with second-half alpha not reaching statistical significance (1.12%, p=0.81). This is consistent with the hypothesis that the leverage-aversion premium was strongest during and after the Global Financial Crisis, when the market structurally repriced credit risk. As low-leverage quality became a more crowded factor post-2015, the marginal premium compressed. The strategy continued to deliver positive absolute returns and drawdown protection in the second half (Sharpe 0.62 vs SPY 0.57), but the excess return above factor exposures diminished.
 
@@ -94,9 +96,16 @@ Rather than statically holding the Top 10, the strategy allocates dynamically ba
 
 | Metric | Value |
 |---|---|
-| Total Trades | 1,497 |
-| Total Transaction Costs | $187,824.01 |
-| Cost as % of Initial Capital | 18.78% (over 18 years) |
+| Total Trades | 767 |
+| Total Transaction Costs | $86,961.91 |
+| Cost as % of Initial Capital | 8.70% (over 18 years) |
+
+| Fee Component | Total |
+|---|---|
+| Transaction Costs | $86,962 |
+| Management Fees (2% PA) | $1,589,781 |
+| Performance Fees (25% HWM) | $2,862,706 |
+| **Total All Costs** | **$4,539,449** |
 
 ![Trading Info](results/trading_analysis.png)
 

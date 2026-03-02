@@ -94,6 +94,14 @@ class RegimeAwareBacktester:
         self.nan_streak = defaultdict(int)  # ticker → consecutive NaN days
         self.survivorship_warnings = []
 
+        # Fee tracking
+        self.high_water_mark = config.INITIAL_CAPITAL  # HWM for performance fee
+        self.last_monthly_fee_date = None              # Track last month fee was charged
+        self.last_quarterly_fee_date = None            # Track last quarter fee was charged
+        self.total_management_fees = 0.025
+        self.total_performance_fees = 0.25
+        self.fee_log = []                              # Detailed fee history
+
     # ─────────────────────────────────────────────────────────────────────
     # Data Loading
     # ─────────────────────────────────────────────────────────────────────
@@ -639,14 +647,13 @@ class RegimeAwareBacktester:
 
                 self._rebalance(date, rebalance_str, current_regime)
 
-            # -- Daily mark-to-market --
-            # Note: The original code executed trades at `date`'s Close based on indicators from `date`.
-            # We now execute trades on `date + 1` (the next day's opening/closing price)
-            # Or conservatively, if rebalancing happened today, the trades executed using `date` prices
-            # imply MOC. A safer assumption is moving forward by tracking next-day prices.
-            # To avoid massive logical changes in `_rebalance_on_quarter`, we simply shift prices
-            # supplied to trade functions forward.
+            # -- Charge fees (if enabled) --
+            # Management fee: first trading day of each month
+            self._charge_management_fee(date)
+            # Performance fee: first trading day of each quarter
+            self._charge_performance_fee(date)
 
+            # -- Daily mark-to-market (AFTER fees) --
             port_val = self._portfolio_value(date)
             spy_price = self.prices.loc[date, 'SPY']
             spy_val = self.spy_shares * spy_price if not pd.isna(spy_price) else np.nan
@@ -665,6 +672,86 @@ class RegimeAwareBacktester:
             print(f"  ⚠ {len(self.delisted_tickers)} positions force-liquidated "
                   f"as delistings: {self.delisted_tickers}")
         return self._build_results()
+
+    # ─────────────────────────────────────────────────────────────────────
+    # Fee Methods
+    # ─────────────────────────────────────────────────────────────────────
+    def _charge_management_fee(self, date: pd.Timestamp):
+        """
+        Deduct monthly management fee from cash.
+        Fee = (MANAGEMENT_FEE_ANNUAL / 12) × current portfolio AUM.
+        Only charges once per calendar month.
+        """
+        if config.MANAGEMENT_FEE_ANNUAL <= 0:
+            return
+
+        # Check if we've already charged this month
+        current_month = (date.year, date.month)
+        if self.last_monthly_fee_date is not None:
+            last_month = (self.last_monthly_fee_date.year, self.last_monthly_fee_date.month)
+            if current_month == last_month:
+                return
+
+        aum = self._portfolio_value(date)
+        monthly_rate = config.MANAGEMENT_FEE_ANNUAL / 12
+        fee = aum * monthly_rate
+
+        self.cash -= fee
+        self.total_management_fees += fee
+        self.last_monthly_fee_date = date
+
+        self.fee_log.append({
+            'date': date,
+            'type': 'management',
+            'aum': aum,
+            'rate': monthly_rate,
+            'fee': fee,
+            'hwm': self.high_water_mark,
+        })
+
+    def _charge_performance_fee(self, date: pd.Timestamp):
+        """
+        Deduct quarterly performance fee on profits above the high-water mark.
+        Fee = PERFORMANCE_FEE_RATE × max(0, current_NAV - HWM).
+        HWM is updated after fee is charged.
+        Only charges once per calendar quarter.
+        """
+        if config.PERFORMANCE_FEE_RATE <= 0:
+            return
+
+        # Check if we've already charged this quarter
+        current_quarter = (date.year, (date.month - 1) // 3)
+        if self.last_quarterly_fee_date is not None:
+            last_quarter = (self.last_quarterly_fee_date.year,
+                            (self.last_quarterly_fee_date.month - 1) // 3)
+            if current_quarter == last_quarter:
+                return
+
+        nav = self._portfolio_value(date)
+        profit_above_hwm = max(0, nav - self.high_water_mark)
+        fee = profit_above_hwm * config.PERFORMANCE_FEE_RATE
+
+        if fee > 0:
+            self.cash -= fee
+            self.total_performance_fees += fee
+
+        # Update HWM regardless (even if no fee charged)
+        # HWM should reflect post-fee NAV
+        post_fee_nav = self._portfolio_value(date)
+        self.high_water_mark = max(self.high_water_mark, post_fee_nav)
+
+        self.last_quarterly_fee_date = date
+
+        self.fee_log.append({
+            'date': date,
+            'type': 'performance',
+            'nav_pre_fee': nav,
+            'hwm_pre': self.high_water_mark if fee == 0 else nav - profit_above_hwm,
+            'profit_above_hwm': profit_above_hwm,
+            'rate': config.PERFORMANCE_FEE_RATE,
+            'fee': fee,
+            'hwm_post': self.high_water_mark,
+        })
 
     # ─────────────────────────────────────────────────────────────────────
     # Results & FF5
@@ -770,6 +857,11 @@ class RegimeAwareBacktester:
                 'trading': {
                     'total_trades': len(trades_df),
                     'total_transaction_costs': self.total_transaction_costs,
+                    'total_management_fees': self.total_management_fees,
+                    'total_performance_fees': self.total_performance_fees,
+                    'total_all_costs': (self.total_transaction_costs +
+                                        self.total_management_fees +
+                                        self.total_performance_fees),
                     'regime_distribution': regime_counts.to_dict(),
                     'delistings_detected': len(self.delisted_tickers),
                     'delisted_tickers': list(self.delisted_tickers),
@@ -838,6 +930,19 @@ class RegimeAwareBacktester:
         print(f"{'Cost as % of Initial':<30} "
               f"{t['total_transaction_costs']/config.INITIAL_CAPITAL:>17.2%}")
         print(f"{'Delistings Detected':<30} {t['delistings_detected']:>18}")
+
+        if config.MANAGEMENT_FEE_ANNUAL > 0 or config.PERFORMANCE_FEE_RATE > 0:
+            print(f"\n{'Fee Structure':}")
+            print("-" * 70)
+            print(f"{'Management Fee (Annual):':<30} {config.MANAGEMENT_FEE_ANNUAL:>17.2%}")
+            print(f"{'Performance Fee (Quarterly):':<30} {config.PERFORMANCE_FEE_RATE:>17.2%}")
+            print(f"{'Total Management Fees':<30} ${t['total_management_fees']:>17,.2f}")
+            print(f"{'Total Performance Fees':<30} ${t['total_performance_fees']:>17,.2f}")
+            print(f"{'Total All Costs':<30} ${t['total_all_costs']:>17,.2f}")
+            print(f"{'All Costs as % of Initial':<30} "
+                  f"{t['total_all_costs']/config.INITIAL_CAPITAL:>17.2%}")
+        else:
+            print(f"\n  Fee Structure: Gross-of-fee (no management/performance fees)")
 
         print(f"\n{'Regime Distribution':}")
         print("-" * 70)
@@ -1062,6 +1167,13 @@ def main():
             trades_path = os.path.join(output_dir, 'trade_log.csv')
             results['trades'].to_csv(trades_path, index=False)
             print(f"  ✓ Trade log saved: {trades_path}")
+
+        # Save fee log
+        if bt.fee_log:
+            fee_df = pd.DataFrame(bt.fee_log)
+            fee_path = os.path.join(output_dir, 'fee_log.csv')
+            fee_df.to_csv(fee_path, index=False)
+            print(f"  ✓ Fee log saved: {fee_path}")
 
         # Save daily history
         history_path = os.path.join(output_dir, 'daily_history.csv')
