@@ -88,6 +88,7 @@ class RegimeAwareBacktester:
         self.prices = None
         self.regime_detector = None
         self.prev_rankings = {}       # ticker → {rank, score} at last rebalance
+        self.last_actioned_rank = {}  # ticker → rank at which we last sold/bought
 
         # Survivorship tracking
         self.delisted_tickers = set()
@@ -98,9 +99,14 @@ class RegimeAwareBacktester:
         self.high_water_mark = config.INITIAL_CAPITAL  # HWM for performance fee
         self.last_monthly_fee_date = None              # Track last month fee was charged
         self.last_quarterly_fee_date = None            # Track last quarter fee was charged
-        self.total_management_fees = 0.025
-        self.total_performance_fees = 0.25
+        self.total_management_fees = 0.0
+        self.total_performance_fees = 0.0
         self.fee_log = []                              # Detailed fee history
+
+        # Capital injection tracking
+        self.total_invested = config.INITIAL_CAPITAL   # Cumulative capital invested
+        self.injection_log = []                        # {date, amount, total_invested}
+        self.next_injection_year = config.INJECTION_INTERVAL_YEARS  # Years until next
 
     # ─────────────────────────────────────────────────────────────────────
     # Data Loading
@@ -111,19 +117,25 @@ class RegimeAwareBacktester:
         print("REGIME-AWARE FUNDAMENTAL BACKTEST (v2 - PIT Clean)")
         print("=" * 70)
 
-        # 1. Build point-in-time rankings
-        print("\n[1/3] Building point-in-time rankings (asof_date gated)...")
-        self.pit_rankings = build_pit_rankings(self.data_dir)
+        # 1. Build or load point-in-time rankings
+        rankings_path = os.path.join(self.script_dir, config.RANKINGS_CACHE)
+
+        if getattr(config, 'SKIP_RANKING_REBUILD', False) and os.path.exists(rankings_path):
+            print("\n[1/3] Loading cached rankings (SKIP_RANKING_REBUILD=True)...")
+            with open(rankings_path, 'r') as f:
+                self.pit_rankings = json.load(f)
+        else:
+            print("\n[1/3] Building point-in-time rankings (asof_date gated)...")
+            self.pit_rankings = build_pit_rankings(self.data_dir)
+            # Save rankings
+            with open(rankings_path, 'w') as f:
+                json.dump(self.pit_rankings, f, indent=2)
+
         self.rebalance_dates = sorted([pd.Timestamp(d) for d in self.pit_rankings.keys()])
         print(f"  ✓ {len(self.rebalance_dates)} rebalance events")
         if self.rebalance_dates:
             print(f"  ✓ First rebalance: {self.rebalance_dates[0].date()}")
             print(f"  ✓ Last rebalance:  {self.rebalance_dates[-1].date()}")
-
-        # Save rankings
-        rankings_path = os.path.join(self.script_dir, config.RANKINGS_CACHE)
-        with open(rankings_path, 'w') as f:
-            json.dump(self.pit_rankings, f, indent=2)
 
         # 2. Collect all tickers
         all_tickers = set(['SPY'])
@@ -394,7 +406,11 @@ class RegimeAwareBacktester:
         if not current_rankings:
             return
 
-        # ── STEP A: Liquidation for fallen ranks ──────────────────────
+        # ── STEP A: Rank-change-based position adjustment ────────────────
+        # Only act when a ticker's rank CHANGES from its last actioned rank.
+        # - Rank deteriorates → sell proportionally (50% per rank lost beyond threshold)
+        # - Rank improves → increase position by 20%
+        # - Rank unchanged → no action (no compounding half-sells)
         for ticker in list(self.positions.keys()):
             if ticker in self.delisted_tickers:
                 continue
@@ -407,17 +423,56 @@ class RegimeAwareBacktester:
                         last = self.prices[ticker].loc[:date].last_valid_index()
                         price = self.prices.loc[last, ticker] if last is not None else np.nan
                     self._sell(ticker, 1.0, price, regime, date, 'UNRANKED_FULL_LIQ')
+                self.last_actioned_rank.pop(ticker, None)
                 continue
 
             rank = current_rankings[ticker]['rank']
+            prev_rank = self.last_actioned_rank.get(ticker, rank)
 
+            # Full liquidation threshold — always fires regardless of history
             if rank > config.FULL_LIQUIDATION_RANK:
                 price = self._get_price(ticker, date)
                 self._sell(ticker, 1.0, price, regime, date, f'FULL_LIQ_RANK_{rank}')
-            elif rank > config.HALF_LIQUIDATION_RANK:
-                price = self._get_price(ticker, date)
-                self._sell(ticker, config.HALF_LIQUIDATION_FRACTION, price, regime, date,
-                           f'HALF_LIQ_RANK_{rank}')
+                self.last_actioned_rank.pop(ticker, None)
+                continue
+
+            # Only act in the half-liq zone if rank has CHANGED
+            if rank > config.HALF_LIQUIDATION_RANK:
+                if rank > prev_rank:
+                    # Rank deteriorated → sell proportionally
+                    ranks_lost = rank - prev_rank
+                    sell_fraction = min(config.HALF_LIQUIDATION_FRACTION * ranks_lost, 1.0)
+                    price = self._get_price(ticker, date)
+                    remaining = self.positions.get(ticker, 0) * (1 - sell_fraction)
+                    if remaining < 1.0:
+                        self._sell(ticker, 1.0, price, regime, date,
+                                   f'FULL_LIQ_DUST_RANK_{rank}')
+                        self.last_actioned_rank.pop(ticker, None)
+                    else:
+                        self._sell(ticker, sell_fraction, price, regime, date,
+                                   f'RANK_DROP_{prev_rank}_TO_{rank}')
+                        self.last_actioned_rank[ticker] = rank
+                elif rank < prev_rank:
+                    # Rank improved while still in warning zone → add 20%
+                    price = self._get_price(ticker, date)
+                    if not pd.isna(price) and price > 0:
+                        current_value = self.positions.get(ticker, 0) * price
+                        add_amount = current_value * 0.20
+                        self._buy(ticker, add_amount, price, regime, date,
+                                  f'RANK_IMPROVE_{prev_rank}_TO_{rank}')
+                    self.last_actioned_rank[ticker] = rank
+                # else: rank unchanged → do nothing
+            else:
+                # Stock is in safe zone (rank <= HALF_LIQUIDATION_RANK)
+                if rank < prev_rank and prev_rank > config.HALF_LIQUIDATION_RANK:
+                    # Recovered from warning zone → add 20%
+                    price = self._get_price(ticker, date)
+                    if not pd.isna(price) and price > 0:
+                        current_value = self.positions.get(ticker, 0) * price
+                        add_amount = current_value * 0.20
+                        self._buy(ticker, add_amount, price, regime, date,
+                                  f'RANK_RECOVER_{prev_rank}_TO_{rank}')
+                self.last_actioned_rank[ticker] = rank
 
         # ── STEP B: Ensure top-N positions are held ───────────────────
         ranked_list = self.pit_rankings[rebalance_date_str]
@@ -647,6 +702,27 @@ class RegimeAwareBacktester:
 
                 self._rebalance(date, rebalance_str, current_regime)
 
+            # -- Capital injection (if enabled) --
+            if config.INJECTION_PCT > 0 and self.next_injection_year is not None:
+                years_elapsed = (date - start_date).days / 365.25
+                if years_elapsed >= self.next_injection_year:
+                    injection_amount = config.INITIAL_CAPITAL * config.INJECTION_PCT
+                    self.cash += injection_amount
+                    self.total_invested += injection_amount
+                    # Also buy equivalent SPY shares for fair benchmark comparison
+                    spy_price = self.prices.loc[date, 'SPY']
+                    if not pd.isna(spy_price) and spy_price > 0:
+                        self.spy_shares += injection_amount / spy_price
+                    self.injection_log.append({
+                        'date': date,
+                        'amount': injection_amount,
+                        'total_invested': self.total_invested,
+                    })
+                    print(f"  [{date.date()}] 💰 CAPITAL INJECTION  "
+                          f"${injection_amount:>12,.0f}  "
+                          f"Total Invested=${self.total_invested:>12,.0f}")
+                    self.next_injection_year += config.INJECTION_INTERVAL_YEARS
+
             # -- Charge fees (if enabled) --
             # Management fee: first trading day of each month
             self._charge_management_fee(date)
@@ -809,8 +885,8 @@ class RegimeAwareBacktester:
         final_port = history_df['portfolio_value'].iloc[-1]
         final_spy = history_df['spy_value'].iloc[-1]
 
-        port_total_return = (final_port / config.INITIAL_CAPITAL) - 1
-        spy_total_return = (final_spy / config.INITIAL_CAPITAL) - 1
+        port_total_return = (final_port / self.total_invested) - 1
+        spy_total_return = (final_spy / self.total_invested) - 1
 
         n_days = len(history_df)
         n_years = n_days / 252
@@ -916,8 +992,12 @@ class RegimeAwareBacktester:
 
         print(f"\n{'Metric':<30} {'Strategy':>18} {'SPY Benchmark':>18}")
         print("-" * 70)
+        print(f"{'Initial Capital':<30} ${config.INITIAL_CAPITAL:>17,.0f}")
+        print(f"{'Total Invested (w/ injects)':<30} ${self.total_invested:>17,.0f}")
+        if self.injection_log:
+            print(f"{'Capital Injections':<30} {len(self.injection_log):>18}")
         print(f"{'Final Value':<30} ${p['final_value']:>17,.0f} ${s['final_value']:>17,.0f}")
-        print(f"{'Total Return':<30} {p['total_return']:>17.2%} {s['total_return']:>17.2%}")
+        print(f"{'Total Return (on invested)':<30} {p['total_return']:>17.2%} {s['total_return']:>17.2%}")
         print(f"{'Annual Return':<30} {p['annual_return']:>17.2%} {s['annual_return']:>17.2%}")
         print(f"{'Volatility':<30} {p['volatility']:>17.2%} {s['volatility']:>17.2%}")
         print(f"{'Sharpe Ratio':<30} {p['sharpe_ratio']:>17.2f} {s['sharpe_ratio']:>17.2f}")

@@ -10,7 +10,12 @@ Version 2: Point-in-time clean. Uses asof_date from chrono-fund engine
 # =============================================================================
 # 1. CAPITAL & PORTFOLIO SIZING
 # =============================================================================
-INITIAL_CAPITAL = 1_000_000          # Starting capital ($)
+INITIAL_CAPITAL = 500_000_000          # Starting capital ($)
+
+# Capital injections: every INJECTION_INTERVAL_YEARS, add INJECTION_PCT of
+# current INITIAL_CAPITAL. Set INJECTION_PCT to 0.0 to disable.
+INJECTION_INTERVAL_YEARS = 2          # Inject new capital every N years
+INJECTION_PCT = 0.0                   # 0% = disabled (set to 0.10 for 10% injections)
 
 # How many top-ranked companies to initially invest in
 TOP_N_INVEST = 10
@@ -26,10 +31,10 @@ HALF_LIQUIDATION_FRACTION = 0.50     # Fraction to sell at half-liq threshold
 # 3. NEW CAPITAL ALLOCATION (rank-jump rewards)
 # =============================================================================
 RANK_JUMP_SMALL = 15                 # Minimum rank improvement for small allocation
-RANK_JUMP_SMALL_CAPITAL = 20_000     # Dollars allocated for 15-rank jump
+RANK_JUMP_SMALL_CAPITAL = 200_000     # Dollars allocated for 15-rank jump
 
 RANK_JUMP_LARGE = 25                 # Minimum rank improvement for large allocation
-RANK_JUMP_LARGE_CAPITAL = 50_000     # ADDITIONAL dollars for 25-rank jump
+RANK_JUMP_LARGE_CAPITAL = 500_000     # ADDITIONAL dollars for 25-rank jump
 
 # =============================================================================
 # 4. PANIC-BUY / DIP-BUYING LOGIC
@@ -109,15 +114,15 @@ OUTPUT_DIR = "results"               # Output directory for charts/reports
 # =============================================================================
 ENABLE_PANIC_BUY = True              # Discretionary overlay to buy dips in crisis
 ENABLE_FF5_ATTRIBUTION = True        # Regress daily returns against Fama-French 5
+SKIP_RANKING_REBUILD = True          # Set True to load cached rankings (fast rerun)
 
 # =============================================================================
 # 12. SCORING FORMULA WEIGHTS
 # =============================================================================
-# The stability score uses EBIT-based ROIC (not NOPAT) to measure pure
-# operating efficiency, while capital structure risk is captured separately
-# by the bounded inverse D/E transform. This separation of concerns avoids
-# double-penalizing leveraged firms.
-SCORE_WEIGHT_ROIC = 0.30             # EBIT / Invested Capital
+# The stability score intentionally overweights leverage aversion via the
+# bounded inverse D/E transform. This is the core investment thesis, not
+# a normalization choice. See README for rationale.
+SCORE_WEIGHT_ROIC = 0.30
 SCORE_WEIGHT_FCF_MARGIN = 0.25
 SCORE_WEIGHT_DE_INVERSE = 0.25       # Uses 1/(D/E + 1) ∈ [0,1], deliberately outsized
 SCORE_WEIGHT_REV_GROWTH = 0.20
@@ -128,5 +133,5 @@ SCORE_WEIGHT_REV_GROWTH = 0.20
 # Management fee: charged monthly as (annual_rate / 12) × AUM
 # Performance fee: charged quarterly as rate × max(0, NAV - HWM)
 # Set both to 0.0 to run gross-of-fee backtest (no code changes needed).
-MANAGEMENT_FEE_ANNUAL = 0.02         # 2% per annum, deducted monthly
-PERFORMANCE_FEE_RATE = 0.25          # 25% of quarterly profits above HWM
+MANAGEMENT_FEE_ANNUAL = 0.02          # Set to 0.02 for 2% per annum
+PERFORMANCE_FEE_RATE = 0.15           # Set to 0.20 for 20% of quarterly profits above HWM
