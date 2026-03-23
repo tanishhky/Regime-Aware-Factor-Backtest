@@ -109,10 +109,16 @@ def _compute_raw_metrics(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
-def _compute_ewma_score(ticker_filings: pd.DataFrame) -> pd.DataFrame:
+def _compute_ewma_score(ticker_filings: pd.DataFrame,
+                        weights: dict = None) -> pd.DataFrame:
     """
     Compute EWMA stability score for a single ticker's filing history.
     Filings must be sorted by period_end (chronological order of fiscal periods).
+
+    Parameters
+    ----------
+    weights : optional dict with keys 'roic', 'fcf_margin', 'de_inverse', 'rev_growth'
+              Falls back to config.SCORE_WEIGHT_* if not provided.
     """
     tf = ticker_filings.copy()
 
@@ -124,12 +130,17 @@ def _compute_ewma_score(ticker_filings: pd.DataFrame) -> pd.DataFrame:
     tf['d_e_ewma'] = calc_ewma(tf['d_e'])
     tf['rev_growth_ewma'] = calc_ewma(tf['rev_growth'])
 
+    w_roic = weights['roic'] if weights else config.SCORE_WEIGHT_ROIC
+    w_fcf = weights['fcf_margin'] if weights else config.SCORE_WEIGHT_FCF_MARGIN
+    w_de = weights['de_inverse'] if weights else config.SCORE_WEIGHT_DE_INVERSE
+    w_rev = weights['rev_growth'] if weights else config.SCORE_WEIGHT_REV_GROWTH
+
     d_e_clamped = np.maximum(tf['d_e_ewma'], 0)
     tf['stability_score'] = (
-        config.SCORE_WEIGHT_ROIC * tf['roic_ewma'] +
-        config.SCORE_WEIGHT_FCF_MARGIN * tf['fcf_margin_ewma'] +
-        config.SCORE_WEIGHT_DE_INVERSE * (1 / (d_e_clamped + 1)) +
-        config.SCORE_WEIGHT_REV_GROWTH * tf['rev_growth_ewma']
+        w_roic * tf['roic_ewma'] +
+        w_fcf * tf['fcf_margin_ewma'] +
+        w_de * (1 / (d_e_clamped + 1)) +
+        w_rev * tf['rev_growth_ewma']
     )
 
     return tf

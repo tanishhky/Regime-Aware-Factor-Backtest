@@ -31,6 +31,19 @@ import config
 from rank_system_v2 import build_pit_rankings
 from regime_detector import WalkForwardRegimeDetector
 
+# Options hedge overlay (conditional)
+if getattr(config, 'ENABLE_OPTIONS_HEDGE', False):
+    from options_hedge import (
+        SyntheticOptionsData, OptionsHedgeEngine, HedgeConfig,
+        WRDSSampleCalibrator
+    )
+
+# Adaptive engine (drawdown management, alpha fade, walk-forward optimizer)
+from adaptive_engine import (
+    DrawdownManager, AlphaFadeManager, ParameterMonitor,
+    WalkForwardOptimizer, REGIME_LIQ_THRESHOLDS
+)
+
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # HELPERS
@@ -103,10 +116,87 @@ class RegimeAwareBacktester:
         self.total_performance_fees = 0.0
         self.fee_log = []                              # Detailed fee history
 
+        # Options hedge overlay
+        self.hedge_engine = None
+        if getattr(config, 'ENABLE_OPTIONS_HEDGE', False):
+            try:
+                # Optional: calibrate from WRDS sample
+                skew_slope = getattr(config, 'HEDGE_SKEW_SLOPE', 2.5)
+                spread_base = getattr(config, 'HEDGE_SPREAD_BASE_PCT', 0.03)
+                if getattr(config, 'USE_WRDS_CALIBRATION', False) and config.WRDS_USERNAME:
+                    print("  Calibrating hedge model from WRDS sample...")
+                    cal = WRDSSampleCalibrator(wrds_username=config.WRDS_USERNAME)
+                    params = cal.calibrate()
+                    skew_slope = params.get('skew_slope', skew_slope)
+                    spread_base = params.get('spread_base_pct', spread_base)
+
+                hedge_cfg = HedgeConfig(
+                    ENABLE_OPTIONS_HEDGE=True,
+                    MARKET_BETA=config.HEDGE_MARKET_BETA,
+                    LONG_PUT_OTM_PCT=config.HEDGE_LONG_PUT_OTM,
+                    SHORT_PUT_OTM_PCT=config.HEDGE_SHORT_PUT_OTM,
+                    TARGET_DTE=config.HEDGE_TARGET_DTE,
+                    MIN_DTE_TO_HOLD=config.HEDGE_MIN_DTE,
+                    HEDGE_ENTRY_REGIMES=config.HEDGE_ENTRY_REGIMES,
+                    HEDGE_EXIT_REGIMES=config.HEDGE_EXIT_REGIMES,
+                    TRANSITION_PROB_THRESHOLD=config.HEDGE_TRANSITION_PROB_THRESHOLD,
+                    TRANSITION_SCALE_UP=config.HEDGE_TRANSITION_SCALE_UP,
+                    SKEW_SLOPE=skew_slope,
+                    SPREAD_BASE_PCT=spread_base,
+                    SPREAD_VIX_SCALING=getattr(config, 'HEDGE_SPREAD_VIX_SCALING', 0.002),
+                    SPREAD_PENALTY_NORMAL=config.HEDGE_SPREAD_PENALTY_NORMAL,
+                    SPREAD_PENALTY_CRISIS=config.HEDGE_SPREAD_PENALTY_CRISIS,
+                )
+
+                options_data = SyntheticOptionsData(cfg=hedge_cfg)
+                options_data.load(cache_path=getattr(config, 'VIX_RF_CACHE', 'vix_rf_cache.parquet'))
+                self.hedge_engine = OptionsHedgeEngine(options_data, hedge_cfg)
+            except Exception as e:
+                print(f"  Options hedge disabled: {e}")
+                self.hedge_engine = None
+
+        # Adaptive engine components
+        self.dd_manager = None
+        if getattr(config, 'ENABLE_DRAWDOWN_SCALING', False):
+            self.dd_manager = DrawdownManager(
+                dd_start=config.DD_START_THRESHOLD,
+                dd_full=config.DD_FULL_THRESHOLD,
+                min_scalar=config.DD_MIN_SCALAR,
+                recovery_speed=config.DD_RECOVERY_SPEED,
+                use_regime_params=getattr(config, 'ENABLE_REGIME_DD_PARAMS', True),
+            )
+
+        self.alpha_fader = None
+        if getattr(config, 'ENABLE_ALPHA_FADE', False):
+            self.alpha_fader = AlphaFadeManager(
+                alpha_window=config.ALPHA_FADE_WINDOW,
+                trigger_months=config.ALPHA_FADE_TRIGGER_MONTHS,
+                min_strategy_weight=config.ALPHA_FADE_MIN_STRATEGY_WEIGHT,
+            )
+
+        self.param_monitor = None
+        if getattr(config, 'ENABLE_EARLY_REFIT', False):
+            self.param_monitor = ParameterMonitor(lookback_days=126)
+
+        self.wf_optimizer = None
+        if getattr(config, 'ENABLE_ADAPTIVE_WEIGHTS', False):
+            self.wf_optimizer = WalkForwardOptimizer(
+                refit_interval=config.ADAPTIVE_REFIT_INTERVAL,
+                lookback=config.ADAPTIVE_LOOKBACK,
+                weight_bounds=config.ADAPTIVE_WEIGHT_BOUNDS,
+                max_weight_change=config.ADAPTIVE_MAX_WEIGHT_CHANGE,
+                top_n=config.TOP_N_INVEST,
+            )
+
+        self.effective_exposure = 1.0
+        self.adaptive_log: list = []
+        self.peak_prices = {}  # For Option 4 trailing stops
+
         # Capital injection tracking
         self.total_invested = config.INITIAL_CAPITAL   # Cumulative capital invested
         self.injection_log = []                        # {date, amount, total_invested}
         self.next_injection_year = config.INJECTION_INTERVAL_YEARS  # Years until next
+
 
     # ─────────────────────────────────────────────────────────────────────
     # Data Loading
@@ -429,15 +519,23 @@ class RegimeAwareBacktester:
             rank = current_rankings[ticker]['rank']
             prev_rank = self.last_actioned_rank.get(ticker, rank)
 
-            # Full liquidation threshold — always fires regardless of history
-            if rank > config.FULL_LIQUIDATION_RANK:
+            # Full liquidation threshold — regime-adaptive if enabled
+            if getattr(config, 'ENABLE_ADAPTIVE_LIQUIDATION', False):
+                liq = REGIME_LIQ_THRESHOLDS.get(regime, {'half': 15, 'full': 18})
+                full_liq_rank = liq['full']
+                half_liq_rank = liq['half']
+            else:
+                full_liq_rank = config.FULL_LIQUIDATION_RANK
+                half_liq_rank = config.HALF_LIQUIDATION_RANK
+
+            if rank > full_liq_rank:
                 price = self._get_price(ticker, date)
                 self._sell(ticker, 1.0, price, regime, date, f'FULL_LIQ_RANK_{rank}')
                 self.last_actioned_rank.pop(ticker, None)
                 continue
 
             # Only act in the half-liq zone if rank has CHANGED
-            if rank > config.HALF_LIQUIDATION_RANK:
+            if rank > half_liq_rank:
                 if rank > prev_rank:
                     # Rank deteriorated → sell proportionally
                     ranks_lost = rank - prev_rank
@@ -479,7 +577,8 @@ class RegimeAwareBacktester:
         top_n_tickers = [e['ticker'] for e in ranked_list if e['rank'] <= config.TOP_N_INVEST]
 
         port_val = self._portfolio_value(date)
-        target_per_position = port_val / config.TOP_N_INVEST
+        effective_port = port_val * self.effective_exposure
+        target_per_position = effective_port / config.TOP_N_INVEST
 
         for ticker in top_n_tickers:
             if ticker in self.delisted_tickers:
@@ -516,6 +615,8 @@ class RegimeAwareBacktester:
                     continue
 
                 allocation = 0.0
+                # Scale rank-jump capital by effective exposure
+                exposure_scale = self.effective_exposure
                 if rank_improvement >= config.RANK_JUMP_LARGE:
                     allocation = config.RANK_JUMP_SMALL_CAPITAL + config.RANK_JUMP_LARGE_CAPITAL
                     reason = f'RANK_JUMP_{rank_improvement}_LARGE'
@@ -524,6 +625,7 @@ class RegimeAwareBacktester:
                     reason = f'RANK_JUMP_{rank_improvement}_SMALL'
 
                 if allocation > 0:
+                    allocation *= exposure_scale
                     self._buy(ticker, allocation, price, regime, date, reason)
 
         # ── STEP D: Panic-buy during crisis/bear ──────────────────────
@@ -683,6 +785,54 @@ class RegimeAwareBacktester:
 
             self.regime_history.append((date, current_regime))
 
+            # -- Option 4: Position Trailing Stops --
+            if getattr(config, 'ENABLE_TRAILING_STOPS', False):
+                stop_pct = config.TRAILING_STOP_THRESHOLDS.get(current_regime, 0.20)
+                for ticker in list(self.positions.keys()):
+                    p = self._get_price(ticker, date)
+                    if pd.isna(p) or p <= 0: continue
+                    self.peak_prices[ticker] = max(self.peak_prices.get(ticker, p), p)
+                    if p < self.peak_prices[ticker] * (1 - stop_pct):
+                        self._sell(ticker, 1.0, p, current_regime, date, f'TRAILING_STOP_{stop_pct:.0%}')
+                        self.peak_prices.pop(ticker, None)
+                        self.last_actioned_rank.pop(ticker, None)
+
+            # -- Adaptive: drawdown scaling --
+            dd_scalar = 1.0
+            if self.dd_manager is not None:
+                port_val_now = self._portfolio_value(date)
+                dd_scalar = self.dd_manager.update(port_val_now, current_regime, date)
+
+            # -- Adaptive: alpha fade --
+            alpha_weight = 1.0
+            if self.alpha_fader is not None and len(self.portfolio_history) > 0:
+                hist_df = pd.DataFrame(self.portfolio_history)
+                if len(hist_df) > config.ALPHA_FADE_WINDOW:
+                    strat_ret = hist_df['portfolio_value'].pct_change().dropna()
+                    spy_ret = hist_df['spy_value'].pct_change().dropna()
+                    alpha_weight = self.alpha_fader.update(strat_ret, spy_ret, date)
+
+            self.effective_exposure = dd_scalar * alpha_weight
+
+            # -- Adaptive: parameter staleness + refit --
+            if self.param_monitor is not None and len(self.portfolio_history) > 126:
+                hist_df = pd.DataFrame(self.portfolio_history)
+                strat_ret = hist_df['portfolio_value'].pct_change().dropna()
+                spy_ret = hist_df['spy_value'].pct_change().dropna()
+                staleness = self.param_monitor.check_staleness(strat_ret, spy_ret, date)
+                early_trigger = staleness.get('trigger_early_refit', False)
+            else:
+                early_trigger = False
+
+            # Log adaptive state periodically (every 21 days ~ monthly)
+            if i % 21 == 0:
+                self.adaptive_log.append({
+                    'date': date, 'dd_scalar': dd_scalar,
+                    'alpha_weight': alpha_weight,
+                    'effective_exposure': self.effective_exposure,
+                    'regime': current_regime,
+                })
+
             # -- Check for delistings --
             self._check_delistings(date, current_regime)
 
@@ -729,7 +879,20 @@ class RegimeAwareBacktester:
             # Performance fee: first trading day of each quarter
             self._charge_performance_fee(date)
 
-            # -- Daily mark-to-market (AFTER fees) --
+            # -- STEP E: Options hedge overlay --
+            if self.hedge_engine is not None:
+                spy_price_hedge = self.prices.loc[date, 'SPY'] if date in self.prices.index else np.nan
+                if not pd.isna(spy_price_hedge) and spy_price_hedge > 0:
+                    hedge_cash_flow = self.hedge_engine.process_day(
+                        date=date,
+                        spy_price=spy_price_hedge,
+                        regime=current_regime,
+                        portfolio_value=self._portfolio_value(date),
+                        hmm_transition_probs=None,  # Add HMM transition probs later
+                    )
+                    self.cash += hedge_cash_flow
+
+            # -- Daily mark-to-market (AFTER fees and hedge) --
             port_val = self._portfolio_value(date)
             spy_price = self.prices.loc[date, 'SPY']
             spy_val = self.spy_shares * spy_price if not pd.isna(spy_price) else np.nan
@@ -882,7 +1045,29 @@ class RegimeAwareBacktester:
         history_df = pd.DataFrame(self.portfolio_history).set_index('date')
         trades_df = pd.DataFrame(self.trade_log)
 
-        final_port = history_df['portfolio_value'].iloc[-1]
+        # -- Option 2: Volatility Targeting (Applied to daily returns) --
+        if getattr(config, 'ENABLE_VOL_TARGETING', False) and len(history_df) > config.VOL_LOOKBACK:
+            strat_ret = history_df['portfolio_value'].pct_change().fillna(0)
+            realized_vol = strat_ret.rolling(config.VOL_LOOKBACK).std() * np.sqrt(252)
+            realized_vol = realized_vol.shift(1)  # Use yesterday's vol
+            
+            leverage = config.VOL_TARGET / realized_vol.replace(0, np.nan)
+            leverage = leverage.clip(lower=config.VOL_MIN_LEVERAGE, upper=config.VOL_MAX_LEVERAGE)
+            leverage = leverage.fillna(1.0)
+            
+            vol_managed_ret = strat_ret * leverage
+            history_df['portfolio_value'] = config.INITIAL_CAPITAL * (1 + vol_managed_ret).cumprod()
+
+        # -- Option 5: Benchmark Blend --
+        if getattr(config, 'ENABLE_BENCHMARK_BLEND', False) and len(history_df) > 0:
+            w_spy = getattr(config, 'BENCHMARK_BLEND_WEIGHT', 0.40)
+            w_strat = 1.0 - w_spy
+            history_df['portfolio_value'] = (history_df['portfolio_value'] * w_strat) + (history_df['spy_value'] * w_spy)
+
+        if len(history_df) > 0:
+            final_port = history_df['portfolio_value'].iloc[-1]
+        else:
+            final_port = config.INITIAL_CAPITAL
         final_spy = history_df['spy_value'].iloc[-1]
 
         port_total_return = (final_port / self.total_invested) - 1
@@ -950,7 +1135,11 @@ class RegimeAwareBacktester:
                 }
             }
         }
-        
+
+        # Hedge overlay attribution
+        if self.hedge_engine is not None:
+            results['hedge_attribution'] = self.hedge_engine.summary()
+
         if getattr(config, 'ENABLE_FF5_ATTRIBUTION', False):
             results['metrics']['ff5_attribution'] = self._run_ff5_regression(port_returns)
             
@@ -1079,6 +1268,24 @@ class RegimeAwareBacktester:
                 print(f"    Alpha: {sh['alpha_annualized']:.2%}  (t={sh['alpha_tstat']:.2f}, p={sh['alpha_pvalue']:.4f})")
                 print(f"    Sharpe: {sh.get('sharpe', 0):.2f}")
 
+        # Hedge overlay attribution
+        if 'hedge_attribution' in results:
+            h = results['hedge_attribution']
+            print(f"\n{'Options Hedge Overlay':}")
+            print("-" * 70)
+            print(f"  {'Pricing Method:':<35} {h['pricing_method']}")
+            print(f"  {'Skew Slope:':<35} {h['skew_slope']}")
+            print(f"  {'Total Premium Spent:':<35} ${h['total_premium_spent']:>12,.0f}")
+            print(f"  {'Total Expiry Payoffs:':<35} ${h['total_expiry_payoffs']:>12,.0f}")
+            print(f"  {'Total Monetization Proceeds:':<35} ${h['total_monetization_proceeds']:>12,.0f}")
+            print(f"  {'Net Hedge P&L:':<35} ${h['net_hedge_pnl']:>12,.0f}")
+            print(f"  {'Hedge Trades:':<35} {h['total_trades']:>12}")
+            if h.get('regime_breakdown'):
+                print(f"\n  Regime Breakdown:")
+                for regime, stats in sorted(h['regime_breakdown'].items()):
+                    print(f"    {regime:<12} {stats['days']:>6} days  "
+                          f"cash_flow=${stats['total_cash_flow']:>10,.0f}  "
+                          f"avg_VIX={stats['avg_vix']:>5.1f}")
         print("=" * 70)
 
 
@@ -1254,6 +1461,20 @@ def main():
             fee_path = os.path.join(output_dir, 'fee_log.csv')
             fee_df.to_csv(fee_path, index=False)
             print(f"  ✓ Fee log saved: {fee_path}")
+
+        # Save hedge logs
+        if bt.hedge_engine is not None:
+            hedge_log_df = bt.hedge_engine.get_hedge_log_df()
+            if not hedge_log_df.empty:
+                hedge_log_path = os.path.join(output_dir, 'hedge_log.csv')
+                hedge_log_df.to_csv(hedge_log_path, index=False)
+                print(f"  ✓ Hedge log saved: {hedge_log_path}")
+
+            hedge_daily_df = bt.hedge_engine.get_daily_hedge_df()
+            if not hedge_daily_df.empty:
+                hedge_daily_path = os.path.join(output_dir, 'hedge_daily.csv')
+                hedge_daily_df.to_csv(hedge_daily_path, index=False)
+                print(f"  ✓ Hedge daily saved: {hedge_daily_path}")
 
         # Save daily history
         history_path = os.path.join(output_dir, 'daily_history.csv')

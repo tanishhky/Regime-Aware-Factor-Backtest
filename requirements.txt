@@ -6,3 +6,7 @@ hmmlearn>=0.3.0
 scikit-learn>=1.2.0
 scipy>=1.10.0
 pyarrow>=10.0.0
+statsmodels>=0.14.0
+pandas-datareader>=0.10.0
+wrds>=3.1.0
+tqdm>=4.64.0

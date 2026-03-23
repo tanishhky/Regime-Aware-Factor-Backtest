@@ -135,3 +135,119 @@ SCORE_WEIGHT_REV_GROWTH = 0.20
 # Set both to 0.0 to run gross-of-fee backtest (no code changes needed).
 MANAGEMENT_FEE_ANNUAL = 0.02          # Set to 0.02 for 2% per annum
 PERFORMANCE_FEE_RATE = 0.15           # Set to 0.20 for 20% of quarterly profits above HWM
+
+# =============================================================================
+# 14. OPTIONS HEDGE OVERLAY (Regime-Conditional Put Spreads via Synthetic BS)
+# =============================================================================
+# Master switch — set False for A/B comparison (hedged vs unhedged)
+ENABLE_OPTIONS_HEDGE = False
+
+# Pricing: VIX-based synthetic Black-Scholes (no full OptionMetrics needed)
+VIX_RF_CACHE = 'vix_rf_cache.parquet'
+
+# Optional WRDS calibration (uses optionmsamp_us sample to fit skew model)
+WRDS_USERNAME = None                  # Set to your username to enable
+USE_WRDS_CALIBRATION = False          # Set True to calibrate from sample
+
+# Hedge sizing (beta-adjusted)
+HEDGE_NOTIONAL_FRACTION = 1.0         # 1.0 = full beta-adjusted exposure
+HEDGE_MARKET_BETA = 0.77              # From FF5 Mkt-RF loading
+
+# Put spread strikes
+HEDGE_LONG_PUT_OTM = 0.05            # 5% OTM  → protection floor
+HEDGE_SHORT_PUT_OTM = 0.15           # 15% OTM → spread lower leg
+# Protection band: covers -5% to -15% SPY drawdown
+
+# Tenor
+HEDGE_TARGET_DTE = 30                 # ~1 month rolling puts
+HEDGE_MIN_DTE = 5                     # Roll at ≤5 DTE remaining
+
+# Regime rules: BUY when vol is cheap, SELL when vol is expensive
+HEDGE_ENTRY_REGIMES = ('normal', 'bull')
+HEDGE_EXIT_REGIMES = ('crisis', 'bear')
+
+# HMM transition early-entry (optional)
+HEDGE_TRANSITION_PROB_THRESHOLD = 0.30
+HEDGE_TRANSITION_SCALE_UP = 1.5
+
+# Synthetic pricing model parameters
+# Skew: IV(K) = VIX/100 * (1 + slope * |moneyness|)
+HEDGE_SKEW_SLOPE = 2.5               # Literature default; override with WRDS calibration
+# Spread: half_spread = mid * (base + vix_scaling * max(0, VIX-15))
+HEDGE_SPREAD_BASE_PCT = 0.03
+HEDGE_SPREAD_VIX_SCALING = 0.002
+
+# Execution slippage on top of synthetic spread
+HEDGE_SPREAD_PENALTY_NORMAL = 0.10    # 10% of bid-ask
+HEDGE_SPREAD_PENALTY_CRISIS = 0.30    # 30% of bid-ask (wider in stress)
+
+# =============================================================================
+# 15. ADAPTIVE OPTIMIZATION (Walk-Forward Parameter Re-Optimization)
+# =============================================================================
+ENABLE_ADAPTIVE_WEIGHTS = False        # Walk-forward scoring weight optimization
+ADAPTIVE_REFIT_INTERVAL = 252         # Re-optimize annually (~252 trading days)
+ADAPTIVE_LOOKBACK = 756               # 3-year lookback for optimization
+ADAPTIVE_WEIGHT_BOUNDS = (0.10, 0.40) # Min/max per scoring factor weight
+ADAPTIVE_MAX_WEIGHT_CHANGE = 0.10     # Max change per factor per refit cycle
+ENABLE_EARLY_REFIT = False             # Trigger refit on staleness detection
+
+# Regime-adaptive liquidation thresholds
+ENABLE_ADAPTIVE_LIQUIDATION = False    # crisis/bear→12/15, normal→15/18, bull→18/22
+
+# Adaptive TOP_N based on score dispersion
+ENABLE_ADAPTIVE_TOP_N = False
+ADAPTIVE_TOP_N_MIN = 8               # Concentrate when dispersion high
+ADAPTIVE_TOP_N_MAX = 15              # Diversify when dispersion low
+ADAPTIVE_DISPERSION_HIGH = 0.05      # σ of top-20 scores above this → concentrate
+ADAPTIVE_DISPERSION_LOW = 0.02       # σ below this → diversify
+
+# =============================================================================
+# 16. DRAWDOWN MANAGEMENT
+# =============================================================================
+ENABLE_DRAWDOWN_SCALING = False
+DD_START_THRESHOLD = -0.05            # Start reducing exposure at -5% from HWM
+DD_FULL_THRESHOLD = -0.20             # Maximum reduction at -20%
+DD_MIN_SCALAR = 0.25                  # Never below 25% exposure
+DD_RECOVERY_SPEED = 0.5              # Blending speed for recovery (0=frozen, 1=instant)
+ENABLE_REGIME_DD_PARAMS = False        # Use regime-specific DD thresholds
+
+# =============================================================================
+# 17. ALPHA FADE (Strategy → Passive Blend)
+# =============================================================================
+ENABLE_ALPHA_FADE = False
+ALPHA_FADE_WINDOW = 252               # 12-month rolling alpha
+ALPHA_FADE_TRIGGER_MONTHS = 3         # Consecutive negative months to trigger fade
+ALPHA_FADE_MIN_STRATEGY_WEIGHT = 0.30 # Floor: 30% strategy, 70% benchmark
+
+# =============================================================================
+# 18. VOLATILITY TARGETING (Option 2)
+# =============================================================================
+ENABLE_VOL_TARGETING = False
+VOL_TARGET = 0.15                     # Target annualized volatility
+VOL_LOOKBACK = 20                     # 20-day trailing standard deviation
+VOL_MIN_LEVERAGE = 0.3                # Minimum exposure
+VOL_MAX_LEVERAGE = 1.5                # Maximum leverage allowed
+
+# =============================================================================
+# 19. FACTOR MOMENTUM (Option 3)
+# =============================================================================
+ENABLE_FACTOR_MOMENTUM = False
+FACTOR_MOMENTUM_LOOKBACK = 252        # 12 months for long-short performance eval
+
+# =============================================================================
+# 20. POSITION TRAILING STOPS (Option 4)
+# =============================================================================
+ENABLE_TRAILING_STOPS = False
+# Liquidate if price drops below peak * (1 - threshold)
+TRAILING_STOP_THRESHOLDS = {
+    'bull': 0.25,
+    'normal': 0.20,
+    'bear': 0.15,
+    'crisis': 0.12
+}
+
+# =============================================================================
+# 21. BENCHMARK BLEND (Option 5)
+# =============================================================================
+ENABLE_BENCHMARK_BLEND = True
+BENCHMARK_BLEND_WEIGHT = 0.40         # 60% strategy, 40% SPY tracker

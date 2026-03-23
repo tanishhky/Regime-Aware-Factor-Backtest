@@ -1,0 +1,13 @@
+# Virtual environment
+backtest_env/
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+
+# OS
+.DS_Store
+
+# Auto-generated data caches (large)
+vix_rf_cache.parquet
