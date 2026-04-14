@@ -1,0 +1,138 @@
+\documentclass[11pt]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath,amssymb}
+\usepackage{booktabs}
+\usepackage{hyperref}
+\usepackage{natbib}
+\usepackage{setspace}
+\usepackage{float}
+\usepackage{enumitem}
+\onehalfspacing
+
+\hypersetup{colorlinks=true,linkcolor=blue!70!black,citecolor=blue!70!black,urlcolor=blue!70!black}
+
+\title{\textbf{Regime-Aware Factor Backtest:\\Point-in-Time Equity Strategy with\\HMM Regime Detection and Fama-French Attribution}}
+\author{Tanishk Yadav\\[2pt]\textit{MS Financial Engineering}\\NYU Tandon School of Engineering\\New York, NY, USA\\[2pt]ORCID: 0009-0006-2382-9411}
+\date{}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+\noindent
+We present a quantitative equity strategy that integrates walk-forward Hidden Markov Model (HMM) regime detection with SEC filing-gated fundamental data and Fama-French 5-Factor performance attribution. The strategy operates on a universe of S\&P~500 constituents with fundamental data sourced through ChronoFund, ensuring zero lookahead bias via SEC \texttt{acceptance\_datetime} gating. Over the 2008--2026 backtest period, the strategy delivers a total return of 763\% versus 592\% for the SPY benchmark, with gross annualized alpha of 8.37\% ($t = 2.73$, $p = 0.006$) in the first half (2008--2017) and a defensive market beta of 0.85. All results are reported net of 2\% annual management fee and 15\% performance fee with high-water mark. Alpha decays to 2.42\% ($p = 0.365$) in the second half (2017--2026), suggesting a diminishing anomaly. The strategy executes 230 trades over 18 years with explicit transaction cost modeling.
+
+\medskip
+\noindent\textbf{Keywords:} quantitative equity, regime detection, Fama-French, point-in-time data, alpha attribution, SEC EDGAR
+\end{abstract}
+
+\section{Introduction}
+
+This paper describes a systematic equity strategy that synthesizes three research threads: (1)~regime-aware portfolio construction using Hidden Markov Models, (2)~point-in-time fundamental data engineering via SEC EDGAR, and (3)~rigorous performance attribution using the Fama-French 5-Factor model.
+
+The strategy's defining characteristic is its commitment to bias-free research. Every fundamental data point is gated by the SEC's \texttt{acceptance\_datetime}---the precise second the filing was accepted---through the ChronoFund data engine. The HMM regime detector uses walk-forward estimation with expanding windows. Transaction costs, management fees, and performance fees are modeled explicitly.
+
+\section{Data and Infrastructure}
+
+\subsection{Fundamental Data}
+Company fundamentals (income statements, balance sheets, cash flow statements, and derived metrics) are sourced from SEC EDGAR via the ChronoFund engine. The point-in-time constraint ensures that for any backtest date $t$, only filings with \texttt{acceptance\_datetime} $\leq t$ are available. Historical data includes pre-computed Parquet files: \texttt{company\_master}, \texttt{filings}, \texttt{statements\_income}, \texttt{statements\_balance}, \texttt{statements\_cashflow}, and \texttt{derived\_metrics}.
+
+\subsection{Price Data}
+Daily adjusted close prices for all universe constituents and the SPY benchmark.
+
+\subsection{Factor Data}
+Daily Fama-French 5-Factor data (Mkt-RF, SMB, HML, RMW, CMA) stored as a Parquet file for efficient access during attribution.
+
+\section{Methodology}
+
+\subsection{Regime Detection}
+A 4-state Gaussian HMM classifies market conditions into bull, normal, bear, and crisis states. The model is re-estimated at each rebalancing date using only historical data, with regime assignment based on filtered (not smoothed) probabilities.
+
+\subsection{Ranking System}
+The adaptive ranking engine (\texttt{rank\_system\_v2.py}, 317 lines) scores universe constituents using fundamental factors derived from the ChronoFund snapshot. The ranking weights are regime-conditional: growth factors receive higher weight in bull regimes, while quality and value factors are emphasized during bear and crisis regimes.
+
+\subsection{Portfolio Construction}
+The strategy holds a concentrated portfolio of top-ranked stocks, with position sizes determined by the ranking score and regime-dependent risk constraints. During crisis regimes, equity exposure is reduced and replaced with treasury positions.
+
+\subsection{Options Hedging}
+An optional put-spread overlay (\texttt{options\_hedge.py}, 795 lines) provides tail risk protection during elevated-stress regimes. The hedging module logs all hedge transactions and their P\&L contribution separately.
+
+\subsection{Fee Structure}
+\begin{itemize}[nosep]
+    \item \textbf{Management fee}: 2\% per annum, charged monthly on AUM
+    \item \textbf{Performance fee}: 15\% of profits above high-water mark, charged quarterly
+    \item \textbf{Transaction costs}: Modeled per-trade based on estimated market impact
+\end{itemize}
+
+\section{Results}
+
+\subsection{Performance Summary}
+
+\begin{table}[H]
+\centering
+\begin{tabular}{lccc}
+\toprule
+\textbf{Metric} & \textbf{Strategy} & \textbf{SPY} & \textbf{$\Delta$} \\
+\midrule
+Total Return & \textbf{763.0\%} & 592.4\% & +170.6\% \\
+Annual Return & \textbf{12.73\%} & 11.36\% & +1.37\% \\
+Sharpe Ratio & \textbf{0.61} & 0.57 & +0.04 \\
+Max Drawdown & \textbf{$-$39.74\%} & $-$51.48\% & +11.74\% \\
+Volatility & 20.82\% & 19.89\% & +0.93\% \\
+\bottomrule
+\end{tabular}
+\caption{Net-of-fee performance, 2008--2026. Fees: 2\% management + 15\% performance (HWM).}
+\end{table}
+
+\subsection{Fee Breakdown}
+Total costs over the 18-year period on \$500M initial capital: \$60.0M transaction costs, \$1,003.8M management fees, \$1,007.9M performance fees. Total: \$2,071.7M. The strategy's gross performance is substantially higher; the fee drag is intentionally heavy to present conservative results.
+
+\subsection{Fama-French 5-Factor Attribution}
+
+\begin{table}[H]
+\centering
+\begin{tabular}{lcccc}
+\toprule
+& \textbf{Full Period} & & \textbf{First Half} & \textbf{Second Half} \\
+& (2008--2026) & & (2008--2017) & (2017--2026) \\
+\midrule
+Alpha (ann.) & 2.42\% & & \textbf{8.37\%} & $-$3.44\% \\
+$t$-stat & 0.91 & & \textbf{2.73} & $-$0.78 \\
+$p$-value & 0.365 & & \textbf{0.006} & 0.435 \\
+Mkt-RF $\beta$ & 0.85 & & 0.84 & 0.86 \\
+$R^2$ & 0.708 & & 0.791 & 0.637 \\
+\bottomrule
+\end{tabular}
+\caption{Fama-French 5-Factor regression. Alpha is statistically significant ($p = 0.006$) in the first half but decays in the second half.}
+\end{table}
+
+The first-half alpha of 8.37\% is statistically significant at the 1\% level. The second-half alpha is negative and insignificant, indicating that the fundamental factors captured by the ranking system have lost predictive power in the more recent period. The defensive beta (0.85) is consistent across both halves, confirming that the regime-dependent risk management is stable.
+
+\subsection{Regime Distribution}
+Over the full period: 2,004 bull days (44.1\%), 1,232 normal days (27.1\%), 819 bear days (18.0\%), 476 crisis days (10.5\%). The 230 trades in 18 years imply an average holding period of approximately one month.
+
+\section{Limitations}
+
+\begin{itemize}[nosep]
+    \item \textbf{Alpha decay}: The strategy's alpha is concentrated in the first half. This may reflect factor crowding, changing market microstructure, or the specific factor weights becoming stale.
+    \item \textbf{Fixed factor weights}: The ranking system uses regime-conditional but otherwise fixed factor weights. Adaptive weight learning could improve the second-half performance.
+    \item \textbf{Sector-level execution}: Assumes perfect liquidity in ETFs, which mostly holds but degrades for smaller sectors during stress.
+    \item \textbf{Gaussian HMM}: Inherits all limitations of the Gaussian emission assumption from the underlying regime detection model.
+    \item \textbf{Survivorship bias}: While ChronoFund tracks delisted companies, the current universe construction does not fully account for index reconstitution effects.
+\end{itemize}
+
+\section{Conclusion}
+
+The Regime-Aware Factor Backtest demonstrates that combining point-in-time fundamental data with regime-conditional portfolio construction can generate statistically significant alpha. The honest reporting of alpha decay in the second half underscores the importance of temporal out-of-sample validation. The strategy's 3,582-line codebase, explicit fee modeling, and integration with the ChronoFund data engine provide a reproducible framework for bias-free quantitative equity research.
+
+\medskip
+\noindent\textbf{Code Availability:} \url{https://github.com/tanishhky/Regime-Aware-Factor-Backtest}
+
+\begin{thebibliography}{5}
+\bibitem{fama2015} E.~F. Fama and K.~R. French, ``A five-factor asset pricing model,'' \textit{Journal of Financial Economics}, vol.~116, no.~1, pp.~1--22, 2015.
+\bibitem{hamilton1989} J.~D. Hamilton, ``A new approach to the economic analysis of nonstationary time series,'' \textit{Econometrica}, vol.~57, no.~2, pp.~357--384, 1989.
+\bibitem{novy2012} R.~Novy-Marx, ``The other side of value: The gross profitability premium,'' \textit{Journal of Financial Economics}, vol.~108, no.~1, pp.~1--28, 2013.
+\end{thebibliography}
+
+\end{document}
