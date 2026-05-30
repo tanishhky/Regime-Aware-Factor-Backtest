@@ -128,13 +128,13 @@ SCORE_WEIGHT_DE_INVERSE = 0.25       # Uses 1/(D/E + 1) ∈ [0,1], deliberately 
 SCORE_WEIGHT_REV_GROWTH = 0.20
 
 # =============================================================================
-# 13. FEE STRUCTURE (2-and-25 hedge fund standard)
+# 13. FEE STRUCTURE (2-and-15 hedge fund standard)
 # =============================================================================
 # Management fee: charged monthly as (annual_rate / 12) × AUM
 # Performance fee: charged quarterly as rate × max(0, NAV - HWM)
 # Set both to 0.0 to run gross-of-fee backtest (no code changes needed).
-MANAGEMENT_FEE_ANNUAL = 0.02          # Set to 0.02 for 2% per annum
-PERFORMANCE_FEE_RATE = 0.15           # Set to 0.20 for 20% of quarterly profits above HWM
+MANAGEMENT_FEE_ANNUAL = 0.02          # 2% per annum
+PERFORMANCE_FEE_RATE = 0.15           # 15% of quarterly profits above HWM
 
 # =============================================================================
 # 14. OPTIONS HEDGE OVERLAY (Regime-Conditional Put Spreads via Synthetic BS)
