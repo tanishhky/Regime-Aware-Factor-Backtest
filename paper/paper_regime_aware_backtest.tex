@@ -21,7 +21,23 @@
 
 \begin{abstract}
 \noindent
-We present a quantitative equity strategy that integrates walk-forward Hidden Markov Model (HMM) regime detection with SEC filing-gated fundamental data and Fama-French 5-Factor performance attribution. The strategy operates on a universe of S\&P~500 constituents with fundamental data sourced through ChronoFund, ensuring zero lookahead bias via SEC \texttt{acceptance\_datetime} gating. Over the 2008--2026 backtest period, the strategy delivers a total return of 763\% versus 592\% for the SPY benchmark, with gross annualized alpha of 8.37\% ($t = 2.73$, $p = 0.006$) in the first half (2008--2017) and a defensive market beta of 0.85. All results are reported net of 2\% annual management fee and 15\% performance fee with high-water mark. Alpha decays to 2.42\% ($p = 0.365$) in the second half (2017--2026), suggesting a diminishing anomaly. The strategy executes 230 trades over 18 years with explicit transaction cost modeling.
+We present a deliberately bias-free quantitative equity backtest that integrates
+walk-forward Hidden Markov Model (HMM) regime detection with SEC filing-gated
+fundamental data and Fama-French 5-Factor (FF5) performance attribution. Fundamental
+data is sourced through ChronoFund with zero look-ahead via SEC
+\texttt{acceptance\_datetime} gating; regimes are fit only on trailing data; held-name
+delistings are penalized; and all returns are net of a 2-and-15 fee structure (2\%
+management, 15\% performance with high-water mark). Our central result is an honest
+one: \emph{alpha decay}. Over 2008--2026 the strategy's FF5 alpha is statistically
+\emph{insignificant} ($2.42\%$/yr, $t = 0.91$, $p = 0.365$). Splitting the sample
+reveals why: alpha was significant in the first half (2008--2017: $8.37\%$/yr,
+$t = 2.73$, $p = 0.006$) and vanished in the second (2017--2026: $-3.44\%$/yr,
+$p = 0.435$). Net of fees the strategy still edges SPY on CAGR ($12.7\%$ vs $11.4\%$),
+Sharpe ($0.61$ vs $0.57$), and maximum drawdown ($-39.7\%$ vs $-51.5\%$), but FF5
+attribution shows this edge is market beta ($0.85$) and a small-cap tilt
+($\text{SMB} = 0.18$), not residual alpha. The contribution is the reproducible,
+bias-free framework and the disciplined out-of-sample attribution, not the headline
+return.
 
 \medskip
 \noindent\textbf{Keywords:} quantitative equity, regime detection, Fama-French, point-in-time data, alpha attribution, SEC EDGAR
@@ -124,7 +140,17 @@ Over the full period: 2,004 bull days (44.1\%), 1,232 normal days (27.1\%), 819 
 
 \section{Conclusion}
 
-The Regime-Aware Factor Backtest demonstrates that combining point-in-time fundamental data with regime-conditional portfolio construction can generate statistically significant alpha. The honest reporting of alpha decay in the second half underscores the importance of temporal out-of-sample validation. The strategy's 3,582-line codebase, explicit fee modeling, and integration with the ChronoFund data engine provide a reproducible framework for bias-free quantitative equity research.
+The Regime-Aware Factor Backtest's primary contribution is methodological: a
+reproducible, bias-free framework (point-in-time SEC-gated fundamentals, walk-forward
+regimes, delisting penalties, realistic 2-and-15 fees) for honest factor research.
+Its empirical result is a cautionary one: a leverage-averse, regime-aware fundamental
+strategy that produced significant FF5 alpha in 2008--2017 saw that alpha fully decay
+post-2017, leaving full-period alpha statistically insignificant. The strategy's
+net-of-fee outperformance of SPY is real but is attributable to market beta and a
+small-cap tilt rather than skill. This is exactly the kind of finding that
+out-of-sample, fee-aware, look-ahead-free evaluation is designed to surface --- and
+that less disciplined backtests routinely hide. The 3,582-line codebase and its
+integration with the ChronoFund data engine make the result fully reproducible.
 
 \medskip
 \noindent\textbf{Code Availability:} \url{https://github.com/tanishhky/Regime-Aware-Factor-Backtest}

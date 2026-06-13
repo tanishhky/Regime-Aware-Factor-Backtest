@@ -10,11 +10,29 @@
   <img src="https://img.shields.io/badge/python-3.10+-blue?logo=python&logoColor=white" alt="Python">
   <img src="https://img.shields.io/badge/backtest-2008--2026-green" alt="Period">
   <img src="https://img.shields.io/badge/bias-zero%20lookahead-red" alt="Bias">
-  <img src="https://img.shields.io/badge/alpha-8.37%25%20gross%20(p%3D0.006)-brightgreen" alt="Alpha">
+  <img src="https://img.shields.io/badge/finding-alpha%20decay%20(sig%202008--17%2C%20n.s.%20after)-orange" alt="Finding">
+  <img src="https://img.shields.io/badge/returns-net%20of%202--and--15%20fees-lightgrey" alt="Fees">
   <img src="https://img.shields.io/badge/license-MIT-lightgrey" alt="License">
 </p>
 
 ---
+
+## What this is
+
+A deliberately **bias-free** equity backtest — point-in-time SEC-gated fundamentals,
+walk-forward HMM regimes, zero look-ahead, realistic 2-and-15 hedge-fund fees — built
+to ask an honest question and report the honest answer.
+
+**The finding: alpha decay.** A leverage-averse, regime-aware fundamental strategy
+earned statistically significant Fama-French 5-factor alpha of **8.37%/yr (p=0.006)**
+in **2008–2017**, which **fully decayed to −3.4%/yr (not significant)** in **2017–2026**.
+Over the full 2008–2026 window the FF5 alpha is **insignificant (2.42%, t=0.91,
+p=0.365)**. The strategy's net-of-fee edge over SPY (Sharpe 0.61 vs 0.57, max drawdown
+−39.7% vs −51.5%) is explained by its **market beta (0.85)** and a **small-cap tilt
+(SMB 0.18)** — *not* by residual alpha. The contribution here is the bias-free
+methodology and the honest attribution, not a headline return.
+
+> Numbers below reproduce exactly from `results/metrics.json` via `regime_aware_backtest.py`.
 
 ## Performance Summary (2008–2026)
 
@@ -55,8 +73,8 @@ OLS regression on daily excess returns decomposes performance into systematic fa
 
 | Factor | Loading | Interpretation |
 |:---|---:|:---|
-| **Alpha (Annualized)** | **2.42%** | Net-of-fee residual (t=0.91, p=0.365) |
-| **Alpha (Gross, First Half)** | **8.37%** | t=2.73, **p=0.006** ✱✱ |
+| **Alpha (Annualized, full)** | **2.42%** | Net-of-fee residual, **not significant** (t=0.91, p=0.365) |
+| **Alpha (First Half, 2008–17)** | **8.37%** | Net-of-fee, t=2.73, **p=0.006** ✱✱ — decays after (see below) |
 | Market (Mkt-RF) | 0.85 | Defensive beta (<1.0) |
 | Size (SMB) | 0.18 | Moderate small-cap tilt |
 | Value (HML) | -0.09 | Negligible |
