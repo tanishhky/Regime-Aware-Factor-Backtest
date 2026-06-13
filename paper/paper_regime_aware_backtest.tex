@@ -28,10 +28,10 @@ data is sourced through ChronoFund with zero look-ahead via SEC
 \texttt{acceptance\_datetime} gating; regimes are fit only on trailing data; held-name
 delistings are penalized; and all returns are net of a 2-and-15 fee structure (2\%
 management, 15\% performance with high-water mark). Our central result is an honest
-one: \emph{alpha decay}. Over 2008--2026 the strategy's FF5 alpha is statistically
+one: \emph{alpha decay}. Over 2008-2026 the strategy's FF5 alpha is statistically
 \emph{insignificant} ($2.42\%$/yr, $t = 0.91$, $p = 0.365$). Splitting the sample
-reveals why: alpha was significant in the first half (2008--2017: $8.37\%$/yr,
-$t = 2.73$, $p = 0.006$) and vanished in the second (2017--2026: $-3.44\%$/yr,
+reveals why: alpha was significant in the first half (2008-2017: $8.37\%$/yr,
+$t = 2.73$, $p = 0.006$) and vanished in the second (2017-2026: $-3.44\%$/yr,
 $p = 0.435$). Net of fees the strategy still edges SPY on CAGR ($12.7\%$ vs $11.4\%$),
 Sharpe ($0.61$ vs $0.57$), and maximum drawdown ($-39.7\%$ vs $-51.5\%$), but FF5
 attribution shows this edge is market beta ($0.85$) and a small-cap tilt
@@ -47,7 +47,7 @@ return.
 
 This paper describes a systematic equity strategy that synthesizes three research threads: (1)~regime-aware portfolio construction using Hidden Markov Models, (2)~point-in-time fundamental data engineering via SEC EDGAR, and (3)~rigorous performance attribution using the Fama-French 5-Factor model.
 
-The strategy's defining characteristic is its commitment to bias-free research. Every fundamental data point is gated by the SEC's \texttt{acceptance\_datetime}---the precise second the filing was accepted---through the ChronoFund data engine. The HMM regime detector uses walk-forward estimation with expanding windows. Transaction costs, management fees, and performance fees are modeled explicitly.
+The strategy's defining characteristic is its commitment to bias-free research. Every fundamental data point is gated by the SEC's \texttt{acceptance\_datetime} - the precise second the filing was accepted - through the ChronoFund data engine. The HMM regime detector uses walk-forward estimation with expanding windows. Transaction costs, management fees, and performance fees are modeled explicitly.
 
 \section{Data and Infrastructure}
 
@@ -98,7 +98,7 @@ Max Drawdown & \textbf{$-$39.74\%} & $-$51.48\% & +11.74\% \\
 Volatility & 20.82\% & 19.89\% & +0.93\% \\
 \bottomrule
 \end{tabular}
-\caption{Net-of-fee performance, 2008--2026. Fees: 2\% management + 15\% performance (HWM).}
+\caption{Net-of-fee performance, 2008-2026. Fees: 2\% management + 15\% performance (HWM).}
 \end{table}
 
 \subsection{Fee Breakdown}
@@ -111,7 +111,7 @@ Total costs over the 18-year period on \$500M initial capital: \$60.0M transacti
 \begin{tabular}{lcccc}
 \toprule
 & \textbf{Full Period} & & \textbf{First Half} & \textbf{Second Half} \\
-& (2008--2026) & & (2008--2017) & (2017--2026) \\
+& (2008-2026) & & (2008-2017) & (2017-2026) \\
 \midrule
 Alpha (ann.) & 2.42\% & & \textbf{8.37\%} & $-$3.44\% \\
 $t$-stat & 0.91 & & \textbf{2.73} & $-$0.78 \\
@@ -146,11 +146,11 @@ The Regime-Aware Factor Backtest's primary contribution is methodological: a
 reproducible, bias-free framework (point-in-time SEC-gated fundamentals, walk-forward
 regimes, delisting penalties, realistic 2-and-15 fees) for honest factor research.
 Its empirical result is a cautionary one: a leverage-averse, regime-aware fundamental
-strategy that produced significant FF5 alpha in 2008--2017 saw that alpha fully decay
+strategy that produced significant FF5 alpha in 2008-2017 saw that alpha fully decay
 post-2017, leaving full-period alpha statistically insignificant. The strategy's
 net-of-fee outperformance of SPY is real but is attributable to market beta and a
 small-cap tilt rather than skill. This is exactly the kind of finding that
-out-of-sample, fee-aware, look-ahead-free evaluation is designed to surface --- and
+out-of-sample, fee-aware, look-ahead-free evaluation is designed to surface - and
 that less disciplined backtests routinely hide. The 3,582-line codebase and its
 integration with the ChronoFund data engine make the result fully reproducible.
 
@@ -158,9 +158,9 @@ integration with the ChronoFund data engine make the result fully reproducible.
 \noindent\textbf{Code Availability:} \url{https://github.com/tanishhky/Regime-Aware-Factor-Backtest}
 
 \begin{thebibliography}{5}
-\bibitem{fama2015} E.~F. Fama and K.~R. French, ``A five-factor asset pricing model,'' \textit{Journal of Financial Economics}, vol.~116, no.~1, pp.~1--22, 2015.
-\bibitem{hamilton1989} J.~D. Hamilton, ``A new approach to the economic analysis of nonstationary time series,'' \textit{Econometrica}, vol.~57, no.~2, pp.~357--384, 1989.
-\bibitem{novy2012} R.~Novy-Marx, ``The other side of value: The gross profitability premium,'' \textit{Journal of Financial Economics}, vol.~108, no.~1, pp.~1--28, 2013.
+\bibitem{fama2015} E.~F. Fama and K.~R. French, ``A five-factor asset pricing model,'' \textit{Journal of Financial Economics}, vol.~116, no.~1, pp.~1-22, 2015.
+\bibitem{hamilton1989} J.~D. Hamilton, ``A new approach to the economic analysis of nonstationary time series,'' \textit{Econometrica}, vol.~57, no.~2, pp.~357-384, 1989.
+\bibitem{novy2012} R.~Novy-Marx, ``The other side of value: The gross profitability premium,'' \textit{Journal of Financial Economics}, vol.~108, no.~1, pp.~1-28, 2013.
 \end{thebibliography}
 
 \end{document}
