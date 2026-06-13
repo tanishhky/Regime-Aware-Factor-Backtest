@@ -91,6 +91,18 @@ OLS regression on daily excess returns decomposes performance into systematic fa
 
 The alpha was concentrated in the post-GFC period when the leverage-aversion premium was strongest. As low-leverage quality became a more crowded factor, marginal alpha compressed — consistent with factor lifecycle theory.
 
+### Adaptive Response to Decay
+
+The decay is not just diagnosed — the codebase ships adaptive overlays (`adaptive_engine.py`, behind config flags) that *respond* to it. Running each over the full 2008–2026 path versus the static baseline:
+
+| Config | Ann. Return | Sharpe | Max DD | 2nd-half α | 2nd-half Sharpe |
+|:---|---:|---:|---:|---:|---:|
+| **Baseline (static)** | 12.73% | 0.61 | −39.74% | −3.3% | 0.49 |
+| **Alpha-Fade** (blend → SPY when rolling α turns negative) | **13.68%** | **0.66** | −40.22% | **−1.6%** | 0.57 |
+| **Vol-Targeting** (scale to a vol budget) | 10.18% | 0.64 | **−28.77%** | **−0.8%** | **0.65** |
+
+**Alpha-Fade** lifts both full-period return and Sharpe and roughly *halves* the post-2017 alpha drag; **Vol-Targeting** cuts maximum drawdown by ~11 points at a higher Sharpe and nearly eliminates the second-half drag. Honest caveat: even with Alpha-Fade the full-period FF5 alpha remains statistically insignificant (3.3%, p≈0.22) — the overlays *mitigate* the decay, they do not resurrect alpha. Detecting the decay and having a mechanism that responds to it is the point.
+
 ---
 
 ## Bias Mitigation Framework
