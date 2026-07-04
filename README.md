@@ -259,6 +259,8 @@ All overlays are behind config flags for clean A/B testing. Set any to `True` in
 
 ```bash
 # Clone
+
+![tests](https://github.com/tanishhky/Regime-Aware-Factor-Backtest/actions/workflows/tests.yml/badge.svg)
 git clone https://github.com/tanishhky/Regime-Aware-Factor-Backtest.git
 cd Regime-Aware-Factor-Backtest
 
