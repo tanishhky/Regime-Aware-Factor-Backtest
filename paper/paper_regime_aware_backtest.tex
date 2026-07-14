@@ -3,21 +3,31 @@
 \usepackage[margin=1in]{geometry}
 \usepackage{amsmath,amssymb}
 \usepackage{booktabs}
-\usepackage{hyperref}
-\usepackage{natbib}
-\usepackage{setspace}
 \usepackage{float}
 \usepackage{enumitem}
-\onehalfspacing
+\usepackage{xcolor}
+\usepackage{caption}
+\usepackage{fancyhdr}
+\usepackage[hidelinks]{hyperref}
+\usepackage{titlesec}
 
-\hypersetup{colorlinks=true,linkcolor=blue!70!black,citecolor=blue!70!black,urlcolor=blue!70!black}
+\definecolor{accent}{HTML}{B07D1F}
+\titleformat{\section}{\large\bfseries\color{accent}}{\thesection}{0.6em}{}
+\captionsetup{font=small, labelfont=bf}
+
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\footnotesize\itshape Regime-Aware Factor Backtest}
+\fancyhead[R]{\footnotesize\thepage}
+\renewcommand{\headrulewidth}{0.3pt}
 
 \title{\textbf{Regime-Aware Factor Backtest:\\Point-in-Time Equity Strategy with\\HMM Regime Detection and Fama-French Attribution}}
 \author{Tanishk Yadav\\[2pt]\textit{MS Financial Engineering}\\NYU Tandon School of Engineering\\New York, NY, USA\\[2pt]ORCID: 0009-0006-2382-9411}
-\date{}
+\date{June 2026}
 
 \begin{document}
 \maketitle
+\thispagestyle{fancy}
 
 \begin{abstract}
 \noindent
@@ -154,8 +164,6 @@ out-of-sample, fee-aware, look-ahead-free evaluation is designed to surface - an
 that less disciplined backtests routinely hide. The 3,582-line codebase and its
 integration with the ChronoFund data engine make the result fully reproducible.
 
-\medskip
-\noindent\textbf{Code Availability:} \url{https://github.com/tanishhky/Regime-Aware-Factor-Backtest}
 
 \begin{thebibliography}{5}
 \bibitem{fama2015} E.~F. Fama and K.~R. French, ``A five-factor asset pricing model,'' \textit{Journal of Financial Economics}, vol.~116, no.~1, pp.~1-22, 2015.

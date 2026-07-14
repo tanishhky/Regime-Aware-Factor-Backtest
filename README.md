@@ -302,6 +302,14 @@ PERFORMANCE_FEE_RATE    = 0.15          # 15% of profits above HWM
 
 ---
 
+## Working Paper
+
+A short write-up of this study (`paper/paper_regime_aware_backtest.pdf`) is submitted to SSRN,
+currently under editorial review:
+[Abstract ID 7119441](https://papers.ssrn.com/sol3/papers.cfm?abstract_id=7119441).
+
+---
+
 ## Dependencies
 
 ```
