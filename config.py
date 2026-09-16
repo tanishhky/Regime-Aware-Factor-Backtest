@@ -70,7 +70,7 @@ LONG_TERM_TREND = 63                 # ~1 quarter
 # 7. BACKTEST TIMING
 # =============================================================================
 BACKTEST_START = '2006-01-01'
-BACKTEST_END = '2026-03-01'
+BACKTEST_END = '2026-08-22'
 PRICE_DATA_START = '2005-01-01'      # Extra lookback for regime training
 
 REGIME_TRAIN_WINDOW = 756            # ~3 years rolling window

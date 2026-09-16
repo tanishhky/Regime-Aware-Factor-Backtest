@@ -11,3 +11,10 @@ __pycache__/
 
 # Auto-generated data caches (large)
 vix_rf_cache.parquet
+
+# LaTeX build artifacts
+paper/*.aux
+paper/*.fls
+paper/*.fdb_latexmk
+paper/*.log
+paper/*.out

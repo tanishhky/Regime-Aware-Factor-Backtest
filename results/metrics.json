@@ -1,30 +1,30 @@
 {
   "portfolio": {
-    "final_value": 4315053058.594269,
-    "total_return": 7.630106117188538,
-    "annual_return": 0.12734872995621482,
-    "volatility": 0.2082263389620156,
-    "sharpe_ratio": 0.6115879988623611,
+    "final_value": 4494107554.918553,
+    "total_return": 7.988215109837107,
+    "annual_return": 0.1263172329947977,
+    "volatility": 0.2065058504616449,
+    "sharpe_ratio": 0.6116883987180743,
     "max_drawdown": -0.39739917814832687
   },
   "spy": {
-    "final_value": 3462017298.4429984,
-    "total_return": 5.924034596885996,
-    "annual_return": 0.11362287431602924,
-    "volatility": 0.19891980781401622,
-    "sharpe_ratio": 0.571199397207658,
+    "final_value": 3864394265.332891,
+    "total_return": 6.728788530665782,
+    "annual_return": 0.11714415431439185,
+    "volatility": 0.19765248077489464,
+    "sharpe_ratio": 0.5926773792827154,
     "max_drawdown": -0.5148146229379017
   },
   "trading": {
     "total_trades": 230,
     "total_transaction_costs": 60010208.27926982,
-    "total_management_fees": 1003830525.4199001,
+    "total_management_fees": 1051421209.3979272,
     "total_performance_fees": 1007877013.0064921,
-    "total_all_costs": 2071717746.705662,
+    "total_all_costs": 2119308430.683689,
     "regime_distribution": {
-      "bull": 2004,
-      "normal": 1232,
-      "bear": 819,
+      "bull": 2011,
+      "normal": 1302,
+      "bear": 863,
       "crisis": 476
     },
     "delistings_detected": 0,
@@ -34,45 +34,47 @@
     "pit_method": "asof_date (SEC acceptance_datetime)",
     "fallback_lag_days": 60,
     "delisting_return_assumption": -0.3,
-    "survivorship_warnings": []
+    "survivorship_warnings": [
+      "5 tickers with truncated price data"
+    ]
   },
   "ff5_attribution": {
-    "alpha_annualized": 0.02424048233070925,
-    "alpha_tstat": 0.9057753814850283,
-    "alpha_pvalue": 0.36510340988949386,
-    "Mkt-RF": 0.8482801430978337,
-    "SMB": 0.1840535163057603,
-    "HML": -0.08865262479029044,
-    "RMW": 0.06304419325942262,
-    "CMA": -0.0776791348331745,
-    "r_squared": 0.708230346610681
+    "alpha_annualized": 0.02438306505969735,
+    "alpha_tstat": 0.9279006706198243,
+    "alpha_pvalue": 0.3535076957523291,
+    "Mkt-RF": 0.8485208943072052,
+    "SMB": 0.18880110890544882,
+    "HML": -0.08673824498678614,
+    "RMW": 0.0769761426251267,
+    "CMA": -0.058655789904532095,
+    "r_squared": 0.7064252547857488
   },
   "ff5_first_half": {
-    "alpha_annualized": 0.08367262862372232,
-    "alpha_tstat": 2.728533199977995,
-    "alpha_pvalue": 0.006410920566760439,
-    "Mkt-RF": 0.8369790109909059,
-    "SMB": 0.15613978781986004,
-    "HML": -0.10737579142327383,
-    "RMW": -0.014112084439164218,
-    "CMA": -0.03954057788349068,
-    "r_squared": 0.7909777401728619,
-    "sharpe": 0.8433660726203736,
+    "alpha_annualized": 0.08143171820624202,
+    "alpha_tstat": 2.6961948191727068,
+    "alpha_pvalue": 0.007064336246337923,
+    "Mkt-RF": 0.8372835471499047,
+    "SMB": 0.15412927124207126,
+    "HML": -0.10474238352303139,
+    "RMW": -0.0005938747354451339,
+    "CMA": -0.04976721239319053,
+    "r_squared": 0.7877820183822548,
+    "sharpe": 0.8416092766623193,
     "start_date": "2008-02",
-    "end_date": "2017-02"
+    "end_date": "2017-05"
   },
   "ff5_second_half": {
-    "alpha_annualized": -0.03437694726175288,
-    "alpha_tstat": -0.7806216122963928,
-    "alpha_pvalue": 0.43510830285661484,
-    "Mkt-RF": 0.8603584672724749,
-    "SMB": 0.19999618024844693,
-    "HML": -0.0876945165435684,
-    "RMW": 0.09142579257348905,
-    "CMA": -0.09344981120692687,
-    "r_squared": 0.6374055011667099,
-    "sharpe": 0.40669983390593234,
-    "start_date": "2017-02",
-    "end_date": "2026-02"
+    "alpha_annualized": -0.030474855003632288,
+    "alpha_tstat": -0.7061146441641777,
+    "alpha_pvalue": 0.4801888946904401,
+    "Mkt-RF": 0.860714303511068,
+    "SMB": 0.2099649169447863,
+    "HML": -0.0884108090207137,
+    "RMW": 0.10188146094179149,
+    "CMA": -0.06052147512919309,
+    "r_squared": 0.637485225871355,
+    "sharpe": 0.4111198543693366,
+    "start_date": "2017-05",
+    "end_date": "2026-08"
   }
 }
