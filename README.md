@@ -15,6 +15,8 @@
   <img src="https://img.shields.io/badge/license-MIT-lightgrey" alt="License">
 </p>
 
+<p align="center"><strong>Project page:</strong> <a href="https://www.tanishkyadav.me/projects/regime-aware">tanishkyadav.me/projects/regime-aware</a></p>
+
 ---
 
 ## What this is
